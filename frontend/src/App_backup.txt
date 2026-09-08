@@ -1,0 +1,1050 @@
+import { useState } from "react";
+import axios from "axios";
+import "./App.css";
+
+const API = "http://localhost:5001";
+
+function App() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [message, setMessage] = useState("");
+
+  const [resources, setResources] = useState([]);
+  const [reservations, setReservations] = useState([]);
+
+  const [showResources, setShowResources] = useState(false);
+  const [showReservations, setShowReservations] = useState(false);
+  const [showReservationForm, setShowReservationForm] = useState(false);
+
+  const [resourceId, setResourceId] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+
+  // LOGIN
+  const login = async () => {
+    try {
+      const response = await axios.post(`${API}/api/login`, {
+        email,
+        password,
+      });
+
+      localStorage.setItem("token", response.data.token);
+
+      setUser(response.data.user);
+      setLoggedIn(true);
+      setMessage("Login successful!");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || "Login failed"
+      );
+    }
+  };
+
+  // LOGOUT
+  const logout = () => {
+    localStorage.removeItem("token");
+
+    setLoggedIn(false);
+    setUser(null);
+    setEmail("");
+    setPassword("");
+    setMessage("");
+  };
+
+  // GET RESOURCES
+  const viewResources = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.get(
+        `${API}/api/resources`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setResources(response.data);
+      setShowResources(true);
+      setShowReservations(false);
+      setShowReservationForm(false);
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not load resources"
+      );
+    }
+  };
+
+  // CANCEL RESERVATION
+const cancelReservation = async (reservationId) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await axios.delete(
+      `${API}/api/reservations/${reservationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    setMessage(
+      response.data.message ||
+        "Reservation cancelled successfully"
+    );
+
+    // Refresh reservations
+    viewReservations();
+
+  } catch (error) {
+    setMessage(
+      error.response?.data?.error ||
+        "Could not cancel reservation"
+    );
+  }
+};
+
+  // GET MY RESERVATIONS
+  const viewReservations = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.get(
+        `${API}/api/my-reservations`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setReservations(response.data);
+      setShowReservations(true);
+      setShowResources(false);
+      setShowReservationForm(false);
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not load reservations"
+      );
+    }
+  };
+
+  // OPEN RESERVATION FORM
+  const openReservationForm = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.get(
+        `${API}/api/resources`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setResources(response.data);
+      setShowReservationForm(true);
+      setShowResources(false);
+      setShowReservations(false);
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not load resources"
+      );
+    }
+  };
+
+  // CREATE RESERVATION
+  const makeReservation = async () => {
+    if (!resourceId || !startTime || !endTime) {
+      setMessage("Please fill all reservation fields.");
+      return;
+    }
+
+    if (new Date(startTime) >= new Date(endTime)) {
+      setMessage(
+        "End time must be after start time."
+      );
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.post(
+        `${API}/api/reservations`,
+        {
+          resource_id: Number(resourceId),
+          start_time: startTime.replace("T", " "),
+          end_time: endTime.replace("T", " "),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setMessage(
+        response.data.message ||
+          "Reservation created successfully!"
+      );
+
+      setResourceId("");
+      setStartTime("");
+      setEndTime("");
+
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not create reservation"
+      );
+    }
+  };
+
+  if (loggedIn) {
+
+  if (user?.role === "admin") {
+    return (
+      <AdminDashboard
+        user={user}
+        logout={logout}
+      />
+    );
+  }
+    return (
+      <div className="dashboard">
+
+        <nav className="navbar">
+          <div>
+            <h2>🏫 CampusReserve</h2>
+            <span>
+              College Resource Reservation System
+            </span>
+          </div>
+
+          <button onClick={logout}>
+            Logout
+          </button>
+        </nav>
+
+        <div className="dashboard-content">
+
+          <h1>
+            Welcome, {user?.name} 👋
+          </h1>
+
+          <p className="subtitle">
+            Manage your college resources and reservations.
+          </p>
+
+          <div className="cards">
+
+            <div className="card">
+              <h3>🏫 College Resources</h3>
+              <p>
+                View available college resources.
+              </p>
+
+              <button onClick={viewResources}>
+                View Resources
+              </button>
+            </div>
+
+            <div className="card">
+              <h3>📅 Make Reservation</h3>
+              <p>
+                Reserve a collegeresource.
+              </p>
+
+              <button onClick={openReservationForm}>
+                Reserve Resource
+              </button>
+            </div>
+
+            <div className="card">
+              <h3>📋 My Reservations</h3>
+              <p>
+                View your current reservations.
+              </p>
+
+              <button onClick={viewReservations}>
+                View Reservations
+              </button>
+            </div>
+
+          </div>
+
+          {message && (
+            <div className="message">
+              {message}
+            </div>
+          )}
+
+          {/* RESERVATION FORM */}
+
+          {showReservationForm && (
+            <div className="profile-card">
+
+              <h2>📅 Make a Reservation</h2>
+
+              <label>Select Resource</label>
+
+              <select
+                value={resourceId}
+                onChange={(e) =>
+                  setResourceId(e.target.value)
+                }
+              >
+                <option value="">
+                  -- Select Resource --
+                </option>
+
+                {resources
+                  .filter(
+                    (resource) =>
+                      resource.status === "available"
+                  )
+                  .map((resource) => (
+                    <option
+                      key={resource.id}
+                      value={resource.id}
+                    >
+                      {resource.name} - {resource.type}
+                    </option>
+                  ))}
+              </select>
+
+              <label>Start Time</label>
+
+              <input
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) =>
+                  setStartTime(e.target.value)
+                }
+              />
+
+              <label>End Time</label>
+
+              <input
+                type="datetime-local"
+                value={endTime}
+                onChange={(e) =>
+                  setEndTime(e.target.value)
+                }
+              />
+
+              <button
+                onClick={makeReservation}
+              >
+                Reserve Resource
+              </button>
+
+            </div>
+          )}
+
+          {/* RESOURCES */}
+
+          {showResources && (
+            <div className="profile-card">
+
+              <h2>
+                🏫 Available College Resources
+              </h2>
+
+              {resources.length === 0 ? (
+                <p>No resources found.</p>
+              ) : (
+                resources.map((resource) => (
+                  <div
+                    key={resource.id}
+                    className="resource-item"
+                  >
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {resource.name}
+                    </p>
+
+                    <p>
+                      <strong>Type:</strong>{" "}
+                      {resource.type}
+                    </p>
+
+                    <p>
+                      <strong>CPU:</strong>{" "}
+                      {resource.cpu}
+                    </p>
+
+                    <p>
+                      <strong>RAM:</strong>{" "}
+                      {resource.ram} GB
+                    </p>
+
+                    <p>
+                      <strong>Storage:</strong>{" "}
+                      {resource.storage} GB
+                    </p>
+
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      {resource.status}
+                    </p>
+
+                    <hr />
+                  </div>
+                ))
+              )}
+
+            </div>
+          )}
+
+          {/* MY RESERVATIONS */}
+
+          {showReservations && (
+            <div className="profile-card">
+
+              <h2>
+                📋 My Reservations
+              </h2>
+
+              {reservations.length === 0 ? (
+                <p>
+                  You have no reservations.
+                </p>
+              ) : (
+                reservations.map((reservation) => (
+                  <div
+                    key={reservation.id}
+                    className="resource-item"
+                  >
+
+                    <p>
+                      <strong>Reservation ID:</strong>{" "}
+                      {reservation.id}
+                    </p>
+
+                    <p>
+                      <strong>Resource:</strong>{" "}
+                      {reservation.resource_name}
+                    </p>
+
+                    <p>
+                      <strong>Start:</strong>{" "}
+                      {reservation.start_time}
+                    </p>
+
+                    <p>
+                      <strong>End:</strong>{" "}
+                      {reservation.end_time}
+                    </p>
+
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      {reservation.status}
+                    </p>
+
+                    {reservation.status !== "cancelled" &&
+ reservation.status !== "rejected" && (
+  <button
+    onClick={() =>
+      cancelReservation(reservation.id)
+    }
+  >
+    Cancel Reservation
+  </button>
+)}
+
+                    <hr />
+
+                  </div>
+                ))
+              )}
+
+            </div>
+          )}
+
+          {/* PROFILE */}
+
+          <div className="profile-card">
+
+            <h2>👤 My Profile</h2>
+
+            <p>
+              <strong>Name:</strong>{" "}
+              {user?.name}
+            </p>
+
+            <p>
+              <strong>Email:</strong>{" "}
+              {user?.email}
+            </p>
+
+            <p>
+              <strong>Role:</strong>{" "}
+              {user?.role}
+            </p>
+
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // LOGIN PAGE
+
+  return (
+    <div className="login-container">
+
+      <div className="login-card">
+
+        <div className="logo">
+          🏫
+        </div>
+
+        <h1>
+          CampusReserve
+        </h1>
+
+        <p>
+          College Resource Reservation System
+        </p>
+
+        <label>Email</label>
+
+        <input
+          type="email"
+          placeholder="Enter your email"
+          value={email}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
+        />
+
+        <label>Password</label>
+
+        <input
+          type="password"
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) =>
+            setPassword(e.target.value)
+          }
+        />
+
+        <button
+          className="login-btn"
+          onClick={login}
+        >
+          Login
+        </button>
+
+        {message && (
+          <div className="message">
+            {message}
+          </div>
+        )}
+
+        <p className="register-text">
+          Don't have an account?{" "}
+          <b>Register</b>
+        </p>
+
+      </div>
+
+    </div>
+  );
+}
+
+function AdminDashboard({ user, logout }) {
+  const [users, setUsers] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [reservations, setReservations] = useState([]);
+
+  const [activeSection, setActiveSection] =
+    useState("overview");
+
+  const [message, setMessage] = useState("");
+
+  const [showAddResource, setShowAddResource] = useState(false);
+  
+  const [newResource, setNewResource] = useState({
+  name: "",
+  type: "",
+  cpu: "",
+  ram: "",
+  storage: ""
+});
+
+  const token = localStorage.getItem("token");
+
+  // LOAD USERS
+  const loadUsers = async () => {
+    try {
+      const response = await axios.get(
+        `${API}/api/admin/users`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setUsers(response.data);
+      setActiveSection("users");
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not load users"
+      );
+    }
+  };
+
+  // LOAD RESOURCES
+  const loadResources = async () => {
+    try {
+      const response = await axios.get(
+        `${API}/api/admin/resources`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setResources(response.data);
+      setActiveSection("resources");
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not load resources"
+      );
+    }
+  };
+
+  // ADD RESOURCE
+const addResource = async () => {
+  try {
+    const response = await axios.post(
+      `${API}/api/admin/resources`,
+      {
+        name: newResource.name,
+        type: newResource.type,
+        cpu: Number(newResource.cpu),
+        ram: Number(newResource.ram),
+        storage: Number(newResource.storage)
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    setMessage(
+      response.data.message ||
+      "Resource created successfully"
+    );
+
+    setNewResource({
+      name: "",
+      type: "",
+      cpu: "",
+      ram: "",
+      storage: ""
+    });
+
+    setShowAddResource(false);
+
+    loadResources();
+
+  } catch (error) {
+    setMessage(
+      error.response?.data?.error ||
+      "Could not create resource"
+    );
+  }
+};
+
+  // LOAD RESERVATIONS
+  const loadReservations = async () => {
+    try {
+      const response = await axios.get(
+        `${API}/api/admin/reservations`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setReservations(response.data);
+      setActiveSection("reservations");
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          "Could not load reservations"
+      );
+    }
+  };
+
+  return (
+    <div className="admin-dashboard">
+
+      {/* NAVBAR */}
+
+      <nav className="navbar">
+
+        <div>
+          <h2>🏫 CampusReserve Admin</h2>
+
+          <span>
+            Welcome, {user?.name}
+          </span>
+        </div>
+
+        <button onClick={logout}>
+          Logout
+        </button>
+
+      </nav>
+
+      <div className="admin-layout">
+
+        {/* SIDEBAR */}
+
+        <aside className="sidebar">
+
+          <button
+            onClick={() =>
+              setActiveSection("overview")
+            }
+          >
+            📊 Overview
+          </button>
+
+          <button onClick={loadUsers}>
+            👥 Users
+          </button>
+
+          <button onClick={loadResources}>
+            🏫 Resources
+          </button>
+
+          <button onClick={loadReservations}>
+            📋 Reservations
+          </button>
+
+        </aside>
+
+        {/* CONTENT */}
+
+        <main className="admin-content">
+
+          {message && (
+            <div className="message">
+              {message}
+            </div>
+          )}
+
+          {/* OVERVIEW */}
+
+          {activeSection === "overview" && (
+            <div>
+
+              <h1>
+                Admin Dashboard
+              </h1>
+
+              <p className="subtitle">
+                Manage your cloud reservation system.
+              </p>
+
+              <div className="admin-stats">
+
+                <div className="stat-card">
+                  <h3>👥 Users</h3>
+                  <p>{users.length}</p>
+                </div>
+
+                <div className="stat-card">
+                  <h3>🏫 Resources</h3>
+                  <p>{resources.length}</p>
+                </div>
+
+                <div className="stat-card">
+                  <h3>📋 Reservations</h3>
+                  <p>{reservations.length}</p>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* USERS */}
+
+          {activeSection === "users" && (
+            <div>
+
+              <h1>👥 Users</h1>
+
+              {users.length === 0 ? (
+                <p>No users found.</p>
+              ) : (
+                <div className="admin-table">
+
+                  <table>
+
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+
+                      {users.map((item) => (
+                        <tr key={item.id}>
+
+                          <td>{item.id}</td>
+                          <td>{item.name}</td>
+                          <td>{item.email}</td>
+                          <td>{item.role}</td>
+
+                        </tr>
+                      ))}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* RESOURCES */}
+
+          {activeSection === "resources" && (
+            <div>
+              
+              <h1>🏫 Resources</h1>
+
+              <button
+  className="add-resource-btn"
+  onClick={() => setShowAddResource(!showAddResource)}
+>
+  ➕ Add Resource
+</button>
+
+{showAddResource && (
+  <div className="add-resource-form">
+
+    <h2>Add College Resource</h2>
+
+    <input
+      type="text"
+      placeholder="Resource name"
+      value={newResource.name}
+      onChange={(e) =>
+        setNewResource({
+          ...newResource,
+          name: e.target.value
+        })
+      }
+    />
+
+    <input
+      type="text"
+      placeholder="Resource type"
+      value={newResource.type}
+      onChange={(e) =>
+        setNewResource({
+          ...newResource,
+          type: e.target.value
+        })
+      }
+    />
+
+    <input
+      type="number"
+      placeholder="CPU cores"
+      value={newResource.cpu}
+      onChange={(e) =>
+        setNewResource({
+          ...newResource,
+          cpu: e.target.value
+        })
+      }
+    />
+
+    <input
+      type="number"
+      placeholder="RAM (GB)"
+      value={newResource.ram}
+      onChange={(e) =>
+        setNewResource({
+          ...newResource,
+          ram: e.target.value
+        })
+      }
+    />
+
+    <input
+      type="number"
+      placeholder="Storage (GB)"
+      value={newResource.storage}
+      onChange={(e) =>
+        setNewResource({
+          ...newResource,
+          storage: e.target.value
+        })
+      }
+    />
+
+    <button onClick={addResource}>
+      Create Resource
+    </button>
+
+  </div>
+)}
+
+              {resources.length === 0 ? (
+                <p>No resources found.</p>
+              ) : (
+                <div className="admin-table">
+
+                  <table>
+
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>CPU</th>
+                        <th>RAM</th>
+                        <th>Storage</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+
+                      {resources.map((resource) => (
+                        <tr key={resource.id}>
+
+                          <td>{resource.id}</td>
+                          <td>{resource.name}</td>
+                          <td>{resource.type}</td>
+                          <td>{resource.cpu}</td>
+                          <td>{resource.ram} GB</td>
+                          <td>{resource.storage} GB</td>
+                          <td>{resource.status}</td>
+
+                        </tr>
+                      ))}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* RESERVATIONS */}
+
+          {activeSection === "reservations" && (
+            <div>
+
+              <h1>📋 Reservations</h1>
+
+              {reservations.length === 0 ? (
+                <p>No reservations found.</p>
+              ) : (
+                <div className="admin-table">
+
+                  <table>
+
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Resource</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+
+                      {reservations.map((reservation) => (
+                        <tr key={reservation.id}>
+
+                          <td>{reservation.id}</td>
+
+                          <td>
+                            {reservation.user_name}
+                          </td>
+
+                          <td>
+                            {reservation.resource_name}
+                          </td>
+
+                          <td>
+                            {reservation.start_time}
+                          </td>
+
+                          <td>
+                            {reservation.end_time}
+                          </td>
+
+                          <td>
+                            {reservation.status}
+                          </td>
+
+                        </tr>
+                      ))}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </main>
+
+      </div>
+
+    </div>
+  );
+}
+
+export default App;
