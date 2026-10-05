@@ -57,6 +57,13 @@ export const getMyReservations = () => {
   );
 };
 
+export const getNotifications = () => {
+  return axios.get(
+    `${API}/api/notifications`,
+    authConfig()
+  );
+};
+
 export const cancelReservation = (id) => {
   return axios.delete(
     `${API}/api/reservations/${id}`,

@@ -1,3 +1,6 @@
+require("dotenv").config();
+
+
 const express = require("express");
 const cors = require("cors");
 const db = require("./db");
@@ -10,15 +13,16 @@ const authenticateToken =
 const adminMiddleware =
     require("./middleware/adminMiddleware");
 
-const JWT_SECRET = "cloud_resource_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -292,21 +296,21 @@ app.delete("/api/reservations/:id", authenticateToken, (req, res) => {
         SET status = 'cancelled'
         WHERE id = ?
         AND user_id = ?
+        AND created_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+        AND status IN ('pending', 'approved')
     `;
 
     db.query(sql, [reservationId, userId], (err, result) => {
-
         if (err) {
             console.log(err);
-
             return res.status(500).json({
                 error: "Database error"
             });
         }
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({
-                error: "Reservation not found or does not belong to you"
+            return res.status(403).json({
+                error: "Cancellation period of 2 hours has expired"
             });
         }
 
@@ -315,6 +319,39 @@ app.delete("/api/reservations/:id", authenticateToken, (req, res) => {
         });
     });
 });
+
+app.get(
+    "/api/notifications",
+    authenticateToken,
+    (req, res) => {
+
+        const userId = req.user.id;
+
+        const sql = `
+            SELECT
+                id,
+                message,
+                is_read,
+                created_at
+            FROM notifications
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+        `;
+
+        db.query(sql, [userId], (err, results) => {
+
+            if (err) {
+                console.log(err);
+
+                return res.status(500).json({
+                    error: "Database error"
+                });
+            }
+
+            res.json(results);
+        });
+    }
+);
 
 app.get(
     "/api/admin/users",
@@ -567,35 +604,117 @@ app.put(
 
         const reservationId = req.params.id;
 
-        const sql = `
-            UPDATE reservations
-            SET status = 'approved'
-            WHERE id = ?
-            AND status = 'pending'
+        // Get reservation + user + resource details
+        const reservationSql = `
+            SELECT
+                reservations.user_id,
+                resources.name AS resource_name,
+                reservations.start_time,
+                reservations.end_time
+            FROM reservations
+            JOIN resources
+                ON reservations.resource_id = resources.id
+            WHERE reservations.id = ?
+            AND reservations.status = 'pending'
         `;
 
-        db.query(sql, [reservationId], (err, result) => {
+        db.query(
+            reservationSql,
+            [reservationId],
+            (err, rows) => {
 
-            if (err) {
-                console.log(err);
+                if (err) {
+                    console.log(err);
+                    return res.status(500).json({
+                        error: "Database error"
+                    });
+                }
 
-                return res.status(500).json({
-                    error: "Database error"
-                });
+                if (rows.length === 0) {
+                    return res.status(404).json({
+                        error: "Pending reservation not found"
+                    });
+                }
+
+                const reservation = rows[0];
+                const userId = reservation.user_id;
+
+                // Approve reservation
+                const updateSql = `
+                    UPDATE reservations
+                    SET status = 'approved'
+                    WHERE id = ?
+                    AND status = 'pending'
+                `;
+
+                db.query(
+                    updateSql,
+                    [reservationId],
+                    (err, result) => {
+
+                        if (err) {
+                            console.log(err);
+                            return res.status(500).json({
+                                error: "Database error"
+                            });
+                        }
+
+                        const start = new Date(reservation.start_time);
+                        const end = new Date(reservation.end_time);
+
+                        const date = start.toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric"
+                        });
+
+                        const startTime = start.toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true
+                        });
+
+                        const endTime = end.toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true
+                        });
+
+                        const message =
+                            `${reservation.resource_name} - ${date} - ${startTime} to ${endTime} - APPROVED`;
+
+                        const notificationSql = `
+                            INSERT INTO notifications
+                            (user_id, message)
+                            VALUES (?, ?)
+                        `;
+
+                        db.query(
+                            notificationSql,
+                            [userId, message],
+                            (err) => {
+
+                                if (err) {
+                                    console.log(err);
+
+                                    return res.status(500).json({
+                                        error: "Reservation approved but notification failed"
+                                    });
+                                }
+
+                                res.json({
+                                    message:
+                                        "Reservation approved successfully"
+                                });
+                            }
+                        );
+                    }
+                );
             }
-
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    error: "Pending reservation not found"
-                });
-            }
-
-            res.json({
-                message: "Reservation approved successfully"
-            });
-        });
+        );
     }
 );
+
 
 app.put(
     "/api/admin/reservations/:id/reject",
@@ -605,38 +724,120 @@ app.put(
 
         const reservationId = req.params.id;
 
-        const sql = `
-            UPDATE reservations
-            SET status = 'rejected'
-            WHERE id = ?
-            AND status = 'pending'
+        // Get reservation + user + resource details
+        const reservationSql = `
+            SELECT
+                reservations.user_id,
+                resources.name AS resource_name,
+                reservations.start_time,
+                reservations.end_time
+            FROM reservations
+            JOIN resources
+                ON reservations.resource_id = resources.id
+            WHERE reservations.id = ?
+            AND reservations.status = 'pending'
         `;
 
-        db.query(sql, [reservationId], (err, result) => {
+        db.query(
+            reservationSql,
+            [reservationId],
+            (err, rows) => {
 
-            if (err) {
-                console.log(err);
+                if (err) {
+                    console.log(err);
+                    return res.status(500).json({
+                        error: "Database error"
+                    });
+                }
 
-                return res.status(500).json({
-                    error: "Database error"
-                });
+                if (rows.length === 0) {
+                    return res.status(404).json({
+                        error: "Pending reservation not found"
+                    });
+                }
+
+                const reservation = rows[0];
+                const userId = reservation.user_id;
+
+                // Reject reservation
+                const updateSql = `
+                    UPDATE reservations
+                    SET status = 'rejected'
+                    WHERE id = ?
+                    AND status = 'pending'
+                `;
+
+                db.query(
+                    updateSql,
+                    [reservationId],
+                    (err, result) => {
+
+                        if (err) {
+                            console.log(err);
+                            return res.status(500).json({
+                                error: "Database error"
+                            });
+                        }
+
+                        const start = new Date(reservation.start_time);
+                        const end = new Date(reservation.end_time);
+
+                        const date = start.toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric"
+                        });
+
+                        const startTime = start.toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true
+                        });
+
+                        const endTime = end.toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true
+                        });
+
+                        const message =
+                            `${reservation.resource_name} - ${date} - ${startTime} to ${endTime} - REJECTED`;
+
+                        const notificationSql = `
+                            INSERT INTO notifications
+                            (user_id, message)
+                            VALUES (?, ?)
+                        `;
+
+                        db.query(
+                            notificationSql,
+                            [userId, message],
+                            (err) => {
+
+                                if (err) {
+                                    console.log(err);
+
+                                    return res.status(500).json({
+                                        error: "Reservation rejected but notification failed"
+                                    });
+                                }
+
+                                res.json({
+                                    message:
+                                        "Reservation rejected successfully"
+                                });
+                            }
+                        );
+                    }
+                );
             }
-
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    error: "Pending reservation not found"
-                });
-            }
-
-            res.json({
-                message: "Reservation rejected successfully"
-            });
-        });
+        );
     }
 );
 
-const PORT = 5001;
+
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });

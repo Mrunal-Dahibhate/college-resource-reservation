@@ -5,15 +5,18 @@ import {
   createReservation,
   getMyReservations,
   cancelReservation,
+  getNotifications,
 } from "../../services/api";
 
 import ResourceList from "./ResourceList";
 import ReservationForm from "./ReservationForm";
 import MyReservations from "./MyReservations";
+import Notifications from "./Notifications";
 
 function UserDashboard({ user, logout }) {
   const [resources, setResources] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   const [showResources, setShowResources] =
     useState(false);
@@ -22,6 +25,9 @@ function UserDashboard({ user, logout }) {
     useState(false);
 
   const [showReservationForm, setShowReservationForm] =
+    useState(false);
+
+  const [showNotifications, setShowNotifications] = 
     useState(false);
 
   const [resourceId, setResourceId] = useState("");
@@ -74,64 +80,92 @@ function UserDashboard({ user, logout }) {
   };
 
   const makeReservation = async () => {
-    if (!resourceId || !startTime || !endTime) {
-      setMessage(
-        "Please fill all reservation fields."
-      );
-      return;
-    }
+  if (!resourceId || !startTime || !endTime) {
+    setMessage("Please fill all reservation fields.");
+    return;
+  }
 
-    if (
-      new Date(startTime) >=
-      new Date(endTime)
-    ) {
-      setMessage(
-        "End time must be after start time."
-      );
-      return;
-    }
+  if (new Date(startTime) >= new Date(endTime)) {
+    setMessage("End time must be after start time.");
+    return;
+  }
 
-    try {
-      const response = await createReservation(
-        resourceId,
-        startTime,
-        endTime
-      );
+  try {
+    const response = await createReservation(
+      resourceId,
+      startTime,
+      endTime
+    );
 
-      setMessage(
-        response.data.message ||
-          "Reservation created successfully!"
-      );
+    // Clear form
+    setResourceId("");
+    setStartTime("");
+    setEndTime("");
 
-      setResourceId("");
-      setStartTime("");
-      setEndTime("");
-    } catch (error) {
-      setMessage(
-        error.response?.data?.error ||
-          "Could not create reservation"
-      );
-    }
-  };
+    // Close reservation form
+    setShowReservationForm(false);
 
-  const viewReservations = async () => {
+    // Load updated reservations
+    await viewReservations();
+
+    // Show success message
+    setMessage(
+      response.data.message ||
+        "Reservation created successfully!"
+    );
+
+  } catch (error) {
+    setMessage(
+      error.response?.data?.error ||
+        "Could not create reservation"
+    );
+  }
+};
+
+
+const viewReservations = async () => {
   try {
     setLoading(true);
 
-    const response =
-      await getMyReservations();
+    const response = await getMyReservations();
 
     setReservations(response.data);
 
     setShowReservations(true);
     setShowResources(false);
     setShowReservationForm(false);
+
     setMessage("");
 
   } catch (error) {
     setMessage(
       error.response?.data?.error ||
         "Could not load reservations"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+const viewNotifications = async () => {
+  try {
+    setLoading(true);
+
+    const response = await getNotifications();
+
+    setNotifications(response.data);
+
+    setShowNotifications(true);
+    setShowResources(false);
+    setShowReservations(false);
+    setShowReservationForm(false);
+
+    setMessage("");
+
+  } catch (error) {
+    setMessage(
+      error.response?.data?.error ||
+        "Could not load notifications"
     );
   } finally {
     setLoading(false);
@@ -193,6 +227,25 @@ function UserDashboard({ user, logout }) {
         </p>
 
         <div className="cards">
+
+          <div className="card">
+
+  <h3>🔔 Notifications</h3>
+
+  <p>
+    View updates about your reservations.
+  </p>
+
+  <button
+    onClick={viewNotifications}
+    disabled={loading}
+  >
+    {loading
+      ? "Loading..."
+      : "View Notifications"}
+  </button>
+
+</div>
 
           <div className="card">
 
@@ -281,6 +334,12 @@ function UserDashboard({ user, logout }) {
             }
           />
         )}
+
+        {showNotifications && (
+  <Notifications
+    notifications={notifications}
+  />
+)}
 
         <div className="profile-card">
 

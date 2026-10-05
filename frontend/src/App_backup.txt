@@ -81,6 +81,13 @@ function App() {
     }
   };
 
+  const canCancelReservation = (createdAt) => {
+        const bookingTime = new Date(createdAt).getTime();
+        const twoHours = 2 * 60 * 60 * 1000;
+
+        return Date.now() - bookingTime < twoHours;
+    };
+
   // CANCEL RESERVATION
 const cancelReservation = async (reservationId) => {
   try {
@@ -455,17 +462,18 @@ const cancelReservation = async (reservationId) => {
                       {reservation.status}
                     </p>
 
-                    {reservation.status !== "cancelled" &&
- reservation.status !== "rejected" && (
-  <button
-    onClick={() =>
-      cancelReservation(reservation.id)
-    }
-  >
-    Cancel Reservation
-  </button>
+                    {new Date(reservation.created_at).getTime() >
+    Date.now() - 2 * 60 * 60 * 1000 ? (
+    <button
+        onClick={() => cancelReservation(reservation.id)}
+    >
+        Cancel Reservation
+    </button>
+) : (
+    <span>
+        Cancellation period expired
+    </span>
 )}
-
                     <hr />
 
                   </div>

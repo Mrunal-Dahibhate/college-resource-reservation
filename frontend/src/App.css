@@ -1030,9 +1030,7 @@ button:disabled {
 
 .cards {
   display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
   margin-top: 38px;
 }
@@ -1406,4 +1404,112 @@ button:disabled {
     padding: 24px;
   }
 
+}
+
+.notifications-card {
+  margin-top: 25px;
+}
+
+.notification-item {
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: #f5f5f5;
+}
+
+.notification-item p {
+  margin-bottom: 6px;
+}
+
+.notification-item small {
+  color: #666;
+}
+
+.notification-item hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.resource-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.resource-images img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+  transition: 0.25s ease;
+}
+
+/* Makes it clear that the image can be clicked */
+.clickable-resource-image {
+  cursor: pointer;
+}
+
+.clickable-resource-image:hover {
+  transform: scale(1.03);
+}
+
+.image-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 9999;
+  padding: 30px;
+}
+
+.large-resource-image {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.close-image {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+
+  width: 45px;
+  height: 45px;
+
+  border: none;
+  border-radius: 50%;
+
+  background: white;
+  color: black;
+
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.close-image:hover {
+  background: #ddd;
+}
+
+@media (max-width: 700px) {
+  .resource-images {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-images img {
+    height: 220px;
+  }
 }
