@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 
-const API = "http://localhost:5001";
+const API = "http://65.0.97.6:5001";
 
 function Login({ setUser }) {
   const [isRegister, setIsRegister] = useState(false);

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://localhost:5001";
+const API = "http://65.0.97.6:5001";
 
 const getToken = () => {
   return localStorage.getItem("token");
