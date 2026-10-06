@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://65.0.97.6:5001";
+const API = "https://fpr5cc7tbg.execute-api.ap-south-1.amazonaws.com";
 
 const getToken = () => {
   return localStorage.getItem("token");
