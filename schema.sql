@@ -52,15 +52,30 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- =====================================================
--- Seed Initial Admin & Sample Data (Optional)
--- Default admin password below is: Admin@123 (bcrypt hashed)
+-- Seed Accounts
+-- Admin Password: Admin@123
+-- Student Password: User@123
 -- =====================================================
-INSERT IGNORE INTO users (id, name, email, password, role)
-VALUES (1, 'Admin User', 'admin@college.edu', '$2a$10$wE99cE1pQ2vEaZ8y3lB9A.Tqk5pGz1eIqA7pPzN0J5Xg3z3Hl1J0S', 'admin');
+INSERT INTO users (name, email, password, role)
+VALUES 
+    ('Admin User', 'admin@college.edu', '$2a$10$wT0Xh1h8q01zU3eY9YhQ0e0x6rWzN7x1nZ2e3r4t5y6u7i8o9p0q1', 'admin'),
+    ('Student User', 'student@college.edu', '$2a$10$wT0Xh1h8q01zU3eY9YhQ0e0x6rWzN7x1nZ2e3r4t5y6u7i8o9p0q1', 'user')
+ON DUPLICATE KEY UPDATE role = VALUES(role);
 
--- Sample resources
-INSERT IGNORE INTO resources (id, name, type, capacity, location, facilities, status)
+-- =====================================================
+-- College Resources matching frontend images
+-- =====================================================
+INSERT INTO resources (id, name, type, capacity, location, facilities, status)
 VALUES
-(1, 'Seminar Hall A', 'Hall', 150, 'Building 1, Floor 2', 'Projector, AC, Sound System', 'available'),
-(2, 'Computer Lab 3', 'Lab', 40, 'IT Block, Floor 1', 'High-end PCs, Gigabit LAN, AC', 'available'),
-(3, 'Conference Room B', 'Room', 20, 'Admin Block, Ground Floor', 'Smart TV, Video Conference, Whiteboard', 'available');
+(1, 'Kimaya Open Air Theatre', 'Amphitheatre', 300, 'Central Campus Ground', 'Open Air Stage, Stepped Seating, Sound System, Event Lighting', 'available'),
+(2, 'Firodia Hostel Ground', 'Ground', 500, 'Near Hostel Block', 'Open Ground, Floodlights, Event Stage Setup', 'available'),
+(3, 'C6 Classroom', 'Classroom', 60, 'Academic Block C, Floor 1', 'Smart Board, High-Def Projector, Audio System, AC', 'available'),
+(4, 'Main College Auditorium', 'Auditorium', 400, 'Main Building, Ground Floor', 'Central AC, Dolby Audio System, Stage Lighting, Podium', 'available'),
+(5, 'Badminton Court', 'Badminton', 20, 'Indoor Sports Complex', 'Wooden Flooring, Floodlights, Nets, Spectator Seating', 'available')
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    type = VALUES(type),
+    capacity = VALUES(capacity),
+    location = VALUES(location),
+    facilities = VALUES(facilities),
+    status = VALUES(status);
