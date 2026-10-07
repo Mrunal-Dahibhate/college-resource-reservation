@@ -18,9 +18,23 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const app = express();
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, or direct browser requests)
+        if (!origin) return callback(null, true);
+        
+        // Allow localhost, amplifyapp domains, or any URL specified in FRONTEND_URL
+        if (
+            origin.includes("localhost") ||
+            origin.includes("amplifyapp.com") ||
+            (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)
+        ) {
+            return callback(null, true);
+        }
+        return callback(null, true); // Allow all for seamless deployment
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
 }));
 
 app.use(express.json());

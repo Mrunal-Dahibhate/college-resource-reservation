@@ -1,7 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-
-const API = "https://fpr5cc7tbg.execute-api.ap-south-1.amazonaws.com";
+import { API } from "../services/api";
 
 function Login({ setUser }) {
   const [isRegister, setIsRegister] = useState(false);
