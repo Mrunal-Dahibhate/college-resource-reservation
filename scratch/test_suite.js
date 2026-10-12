@@ -103,17 +103,17 @@ async function runTestSuite() {
       })
     });
     testUserToken = loginRes.data?.token;
-    recordTest("Auth", "Valid User Login (/api/login)", loginRes.status === 200 && !!testUserToken, `Token generated for ${loginRes.data?.user?.email}`);
+    recordTest("Auth", "User Login (/api/login)", loginRes.status === 200 && !!testUserToken, `Token Length: ${testUserToken?.length}`);
 
-    // Protected Profile with Token
-    const profileRes = await api("/api/profile", {
-      headers: { Authorization: `Bearer ${testUserToken}` }
+    // Protected route check without token
+    const unauthRes = await api("/api/my-reservations");
+    recordTest("Auth", "Protected Route Rejects Unauthenticated Request", unauthRes.status === 401);
+
+    // Protected route check with invalid token
+    const badTokenRes = await api("/api/my-reservations", {
+      headers: { Authorization: "Bearer invalid.token.payload" }
     });
-    recordTest("Auth", "Protected Route with Valid JWT (/api/profile)", profileRes.status === 200 && profileRes.data?.user?.email === testUserEmail);
-
-    // Protected Route without Token
-    const unauthProfileRes = await api("/api/profile");
-    recordTest("Auth", "Protected Route Rejection without Token", unauthProfileRes.status === 401);
+    recordTest("Auth", "Protected Route Rejects Invalid JWT Token", badTokenRes.status === 403);
 
     // -------------------------------------------------------------
     // SUITE 3: RESOURCE LISTING & METADATA
@@ -127,16 +127,64 @@ async function runTestSuite() {
     const targetResourceId = primaryResource.id;
 
     // -------------------------------------------------------------
-    // SUITE 4: SLOTS, AVAILABILITY & BOOKING DYNAMICS
+    // SUITE 4: 8 AM TO 6 PM SLOTS & 15-DAY ADVANCE BOOKING RULES
     // -------------------------------------------------------------
-    console.log("\n--- SUITE 4: SLOTS, AVAILABILITY & BOOKING DYNAMICS ---");
-    const testDate = "2026-11-20"; // A clean future date
+    console.log("\n--- SUITE 4: 8 AM TO 6 PM SLOTS & 15-DAY ADVANCE BOOKING RULES ---");
+    
+    // Dynamic future dates within 15 days window
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-    // Initial slots check
+    const dTest = new Date(now);
+    dTest.setDate(dTest.getDate() + 2);
+    const testDate = fmt(dTest);
+
+    const dFull = new Date(now);
+    dFull.setDate(dFull.getDate() + 4);
+    const fullDate = fmt(dFull);
+
+    const dNext = new Date(now);
+    dNext.setDate(dNext.getDate() + 5);
+    const multiSlotDate = fmt(dNext);
+
+    const dBeyond = new Date(now);
+    dBeyond.setDate(dBeyond.getDate() + 20);
+    const beyond15DaysDate = fmt(dBeyond);
+
+    // 4.1 Slots check: 10 one-hour slots between 8 AM and 6 PM
     const initialSlotsRes = await api(`/api/resources/${targetResourceId}/slots?date=${testDate}`);
-    recordTest("Slots", "Fetch Daily Slots (/api/resources/:id/slots)", initialSlotsRes.status === 200 && initialSlotsRes.data?.totalSlots === 10, `Total: ${initialSlotsRes.data?.totalSlots}, Available: ${initialSlotsRes.data?.availableSlots}`);
+    const totalSlotsIs10 = initialSlotsRes.status === 200 && initialSlotsRes.data?.totalSlots === 10;
+    const firstSlot = initialSlotsRes.data?.slots?.[0];
+    const lastSlot = initialSlotsRes.data?.slots?.[initialSlotsRes.data?.slots?.length - 1];
+    const hoursCorrect = firstSlot?.startTime === "08:00" && lastSlot?.endTime === "18:00";
+    recordTest("Slots", "Daily Slots are 8:00 AM to 6:00 PM (10 One-Hour Slots)", totalSlotsIs10 && hoursCorrect, `Slots: ${initialSlotsRes.data?.totalSlots}, First: ${firstSlot?.label}, Last: ${lastSlot?.label}`);
 
-    // Create reservation for slot 09:00 - 10:00
+    // 4.2 Enforce 15-day advance booking limit: booking 20 days ahead MUST be rejected
+    const beyondAdvanceRes = await api("/api/reservations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testUserToken}` },
+      body: JSON.stringify({
+        resource_id: targetResourceId,
+        start_time: `${beyond15DaysDate} 09:00:00`,
+        end_time: `${beyond15DaysDate} 10:00:00`
+      })
+    });
+    recordTest("Advance Booking", "Reject Booking Beyond 15-Day Advance Window", beyondAdvanceRes.status === 400 && beyondAdvanceRes.data?.error?.includes("15 days"), `Status: ${beyondAdvanceRes.status}, Error: ${beyondAdvanceRes.data?.error}`);
+
+    // 4.3 Enforce operating hours: booking before 8 AM or after 6 PM MUST be rejected
+    const badHoursRes = await api("/api/reservations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testUserToken}` },
+      body: JSON.stringify({
+        resource_id: targetResourceId,
+        start_time: `${testDate} 06:00:00`,
+        end_time: `${testDate} 07:00:00`
+      })
+    });
+    recordTest("Operating Hours", "Reject Booking Outside Operating Hours (8 AM - 6 PM)", badHoursRes.status === 400, `Status: ${badHoursRes.status}, Error: ${badHoursRes.data?.error}`);
+
+    // 4.4 Create single 1-hour reservation within 15-day window (09:00 - 10:00)
     const startDateTime = `${testDate} 09:00:00`;
     const endDateTime = `${testDate} 10:00:00`;
     const reserveRes = await api("/api/reservations", {
@@ -149,14 +197,14 @@ async function runTestSuite() {
       })
     });
     createdReservationId = reserveRes.data?.reservationId;
-    recordTest("Reservation", "Create Resource Reservation", reserveRes.status === 201 && !!createdReservationId, `Reservation ID: ${createdReservationId}`);
+    recordTest("Reservation", "Create Single 1-Hour Reservation within 15 Days", reserveRes.status === 201 && !!createdReservationId, `Reservation ID: ${createdReservationId}`);
 
     // Verify slots count updated (booked +1, available -1)
     const updatedSlotsRes = await api(`/api/resources/${targetResourceId}/slots?date=${testDate}`);
     const slot09 = updatedSlotsRes.data?.slots?.find(s => s.startTime === "09:00");
-    recordTest("Slots", "Slot State Updated after Booking", updatedSlotsRes.data?.bookedSlots >= 1 && slot09?.isBooked === true, `Slot 09:00-10:00 isBooked: ${slot09?.isBooked}`);
+    recordTest("Slots", "Slot Availability Updated (Shows Slots Remaining)", updatedSlotsRes.data?.bookedSlots >= 1 && slot09?.isBooked === true, `Slot 09:00-10:00 isBooked: ${slot09?.isBooked}, Remaining: ${updatedSlotsRes.data?.availableSlots}`);
 
-    // Conflict Prevention: Try booking the exact same slot
+    // 4.5 Conflict Prevention: Try booking the exact same slot
     const conflictRes = await api("/api/reservations", {
       method: "POST",
       headers: { Authorization: `Bearer ${testUserToken}` },
@@ -168,7 +216,29 @@ async function runTestSuite() {
     });
     recordTest("Reservation", "Prevent Overlapping Conflict Reservation", conflictRes.status === 409, `Conflict Error: ${conflictRes.data?.error}`);
 
-    // My Reservations
+    // 4.6 MULTI-SLOT BOOKING: Book multiple slots of a date in a single request
+    console.log("\n--- SUITE 5: MULTI-SLOT BOOKING ON A DATE ---");
+    const multiSlotRes = await api("/api/reservations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testUserToken}` },
+      body: JSON.stringify({
+        resource_id: targetResourceId,
+        slots: [
+          { start_time: `${multiSlotDate} 10:00:00`, end_time: `${multiSlotDate} 11:00:00` },
+          { start_time: `${multiSlotDate} 14:00:00`, end_time: `${multiSlotDate} 15:00:00` }
+        ]
+      })
+    });
+    const multiSlotSuccess = multiSlotRes.status === 201 && multiSlotRes.data?.bookedCount === 2;
+    recordTest("Multi-Slot", "User Can Book Multiple Slots of a Date Simultaneously", multiSlotSuccess, `Booked Count: ${multiSlotRes.data?.bookedCount}, Message: ${multiSlotRes.data?.message}`);
+
+    // Verify both slots are booked in slots API
+    const checkMultiSlots = await api(`/api/resources/${targetResourceId}/slots?date=${multiSlotDate}`);
+    const slot10 = checkMultiSlots.data?.slots?.find(s => s.startTime === "10:00");
+    const slot14 = checkMultiSlots.data?.slots?.find(s => s.startTime === "14:00");
+    recordTest("Multi-Slot", "Verify Both Booked Slots Marked as Booked in Table Data", slot10?.isBooked === true && slot14?.isBooked === true, `Slot 10-11: ${slot10?.isBooked}, Slot 14-15: ${slot14?.isBooked}, Remaining: ${checkMultiSlots.data?.availableSlots}/10`);
+
+    // My Reservations contains user bookings
     const myRes = await api("/api/my-reservations", {
       headers: { Authorization: `Bearer ${testUserToken}` }
     });
@@ -176,12 +246,10 @@ async function runTestSuite() {
     recordTest("Reservation", "View User's Reservations (/api/my-reservations)", myRes.status === 200 && foundMyRes, `User has ${myRes.data?.length} reservation(s)`);
 
     // -------------------------------------------------------------
-    // SUITE 5: FULLY-BOOKED DATE & DISABLED DATE ENFORCEMENT
+    // SUITE 6: FULLY-BOOKED DATE ENFORCEMENT
     // -------------------------------------------------------------
-    console.log("\n--- SUITE 5: FULLY-BOOKED DATE & DISABLED DATE ENFORCEMENT ---");
-    const fullDate = "2026-11-21";
-
-    // Book all remaining 9 slots (and 1st slot) to fill 08:00 to 18:00
+    console.log("\n--- SUITE 6: FULLY-BOOKED DATE ENFORCEMENT ---");
+    // Book all remaining 10 slots of fullDate (08:00 to 18:00)
     const fullDayRes = await api("/api/reservations", {
       method: "POST",
       headers: { Authorization: `Bearer ${testUserToken}` },
@@ -195,8 +263,9 @@ async function runTestSuite() {
       fullDayReservationIds.push(fullDayRes.data.reservationId);
     }
 
-    // Check availability API for November
-    const monthAvailRes = await api(`/api/resources/${targetResourceId}/availability?month=2026-11`);
+    // Check availability API for this month
+    const currentMonthKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    const monthAvailRes = await api(`/api/resources/${targetResourceId}/availability?month=${currentMonthKey}`);
     const dayData = monthAvailRes.data?.dates?.[fullDate];
     const isFullyBooked = dayData?.isFullyBooked === true && dayData?.availableSlots === 0 && dayData?.bookedSlots === 10;
     recordTest("Availability", "Day marked Fully Booked (0 Available, 10 Booked)", isFullyBooked, `Date ${fullDate}: isFullyBooked=${dayData?.isFullyBooked}, available=${dayData?.availableSlots}`);
@@ -206,9 +275,9 @@ async function runTestSuite() {
     recordTest("Availability", "All Slots Disabled for Fully Booked Day", fullDateSlotsRes.data?.isFullyBooked === true && fullDateSlotsRes.data?.availableSlots === 0, `All ${fullDateSlotsRes.data?.totalSlots} slots booked`);
 
     // -------------------------------------------------------------
-    // SUITE 6: CANCELLATION FLOW
+    // SUITE 7: CANCELLATION FLOW
     // -------------------------------------------------------------
-    console.log("\n--- SUITE 6: CANCELLATION FLOW ---");
+    console.log("\n--- SUITE 7: CANCELLATION FLOW ---");
     const cancelRes = await api(`/api/reservations/${createdReservationId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${testUserToken}` }
@@ -221,9 +290,9 @@ async function runTestSuite() {
     recordTest("Slots", "Slot Freed Up after Cancellation", freedSlot?.isBooked === false, "Slot 09:00-10:00 isBooked: false");
 
     // -------------------------------------------------------------
-    // SUITE 7: ADMIN ROLE SECURITY & OPERATIONS
+    // SUITE 8: ADMIN ROLE SECURITY & OPERATIONS
     // -------------------------------------------------------------
-    console.log("\n--- SUITE 7: ADMIN ROLE SECURITY & OPERATIONS ---");
+    console.log("\n--- SUITE 8: ADMIN ROLE SECURITY & OPERATIONS ---");
     // Regular student accessing admin routes -> MUST BE 403
     const forbiddenUsers = await api("/api/admin/users", {
       headers: { Authorization: `Bearer ${testUserToken}` }
@@ -293,17 +362,21 @@ async function runTestSuite() {
     }
 
     // -------------------------------------------------------------
-    // SUITE 8: ADMIN APPROVAL / REJECTION & NOTIFICATIONS
+    // SUITE 9: ADMIN APPROVAL / REJECTION & NOTIFICATIONS
     // -------------------------------------------------------------
-    console.log("\n--- SUITE 8: ADMIN APPROVAL / REJECTION & NOTIFICATIONS ---");
+    console.log("\n--- SUITE 9: ADMIN APPROVAL / REJECTION & NOTIFICATIONS ---");
+    const dApprove = new Date(now);
+    dApprove.setDate(dApprove.getDate() + 6);
+    const approveDate = fmt(dApprove);
+
     // Create new reservation to test admin approval
     const resvToApprove = await api("/api/reservations", {
       method: "POST",
       headers: { Authorization: `Bearer ${testUserToken}` },
       body: JSON.stringify({
         resource_id: targetResourceId,
-        start_time: "2026-11-22 10:00:00",
-        end_time: "2026-11-22 11:00:00"
+        start_time: `${approveDate} 10:00:00`,
+        end_time: `${approveDate} 11:00:00`
       })
     });
     const approveId = resvToApprove.data?.reservationId;
@@ -328,8 +401,8 @@ async function runTestSuite() {
       headers: { Authorization: `Bearer ${testUserToken}` },
       body: JSON.stringify({
         resource_id: targetResourceId,
-        start_time: "2026-11-22 11:00:00",
-        end_time: "2026-11-22 12:00:00"
+        start_time: `${approveDate} 11:00:00`,
+        end_time: `${approveDate} 12:00:00`
       })
     });
     const rejectId = resvToReject.data?.reservationId;
@@ -348,55 +421,30 @@ async function runTestSuite() {
     const hasRejectedNotif = Array.isArray(userNotifRes2.data) && userNotifRes2.data.some(n => n.message.includes("REJECTED"));
     recordTest("Notifications", "User Receives REJECTED Notification", hasRejectedNotif);
 
-  } catch (error) {
-    console.error("Test Suite Runtime Error:", error);
-  } finally {
     // -------------------------------------------------------------
-    // TEARDOWN & CLEANUP
+    // SUMMARY
     // -------------------------------------------------------------
-    console.log("\n--- TEARDOWN & DATABASE CLEANUP ---");
-    const db = require("../src/db");
-    const cleanupQueries = [];
+    console.log("\n==================================================================");
+    console.log("🏁 TEST SUITE COMPLETED");
+    console.log("==================================================================");
+    const passedCount = results.filter(r => r.passed).length;
+    const totalCount = results.length;
+    console.log(`TOTAL TESTS: ${totalCount}`);
+    console.log(`PASSED: ${passedCount}`);
+    console.log(`FAILED: ${totalCount - passedCount}`);
 
-    if (testUserId) {
-      cleanupQueries.push(`DELETE FROM users WHERE id = ${testUserId}`);
-    }
-    if (createdResourceId) {
-      cleanupQueries.push(`DELETE FROM resources WHERE id = ${createdResourceId}`);
-    }
-    if (fullDayReservationIds.length > 0) {
-      cleanupQueries.push(`DELETE FROM reservations WHERE id IN (${fullDayReservationIds.join(",")})`);
+    if (passedCount === totalCount) {
+      console.log("\n🎉 ALL TESTS PASSED SUCCESSFULLY! 100% HEALTHY");
+      process.exit(0);
+    } else {
+      console.log("\n⚠️ SOME TESTS FAILED. Please review output above.");
+      process.exit(1);
     }
 
-    for (const q of cleanupQueries) {
-      await new Promise(resolve => db.query(q, () => resolve()));
-    }
-    console.log("✓ Cleanup completed successfully.");
-    db.end();
+  } catch (err) {
+    console.error("FATAL ERROR IN TEST SUITE:", err);
+    process.exit(1);
   }
-
-  // -------------------------------------------------------------
-  // TEST SUMMARY
-  // -------------------------------------------------------------
-  console.log("\n==================================================================");
-  console.log("📊 TEST EXECUTION SUMMARY");
-  console.log("==================================================================");
-  const total = results.length;
-  const passed = results.filter(r => r.passed).length;
-  const failed = results.filter(r => !r.passed).length;
-
-  console.log(`Total Tests Run : ${total}`);
-  console.log(`Passed         : ${passed}`);
-  console.log(`Failed         : ${failed}`);
-  console.log(`Success Rate   : ${Math.round((passed / total) * 100)}%`);
-
-  if (failed === 0) {
-    console.log("\n🎉 ALL TESTS PASSED SUCCESSFULLY! The entire project is healthy and verified.");
-  } else {
-    console.log("\n⚠️ Some tests failed. Please review the output above.");
-  }
-
-  process.exit(failed > 0 ? 1 : 0);
 }
 
 runTestSuite();

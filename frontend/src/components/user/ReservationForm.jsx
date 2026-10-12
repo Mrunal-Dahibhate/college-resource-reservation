@@ -21,9 +21,9 @@ function ReservationForm({
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [slotsData, setSlotsData] = useState(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [selectedSlotId, setSelectedSlotId] = useState(null);
-  const [slotRangeEndId, setSlotRangeEndId] = useState(null);
+  const [selectedSlotIds, setSelectedSlotIds] = useState([]);
   const [formError, setFormError] = useState("");
+  const [bookingInProgress, setBookingInProgress] = useState(false);
 
   const formatLocalDate = (date) => {
     const y = date.getFullYear();
@@ -32,7 +32,14 @@ function ReservationForm({
     return `${y}-${m}-${d}`;
   };
 
-  const todayStr = formatLocalDate(new Date());
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = formatLocalDate(today);
+
+  // 15 days advance booking maximum date
+  const maxAdvanceDate = new Date(today);
+  maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 15);
+  const maxAdvanceStr = formatLocalDate(maxAdvanceDate);
 
   // Selected resource object
   const selectedResource = resources.find(
@@ -44,14 +51,24 @@ function ReservationForm({
     currentMonth.getMonth() + 1
   ).padStart(2, "0")}`;
 
+  // Reset date and slots when resource changes
+  const handleResourceChange = (newResourceId) => {
+    setResourceId(newResourceId);
+    setSelectedDate("");
+    setSlotsData(null);
+    setSelectedSlotIds([]);
+    setStartTime("");
+    setEndTime("");
+    setFormError("");
+  };
+
   // Fetch month availability whenever resource or current month changes
   useEffect(() => {
     if (!resourceId) {
       setAvailabilityMap({});
       setSlotsData(null);
       setSelectedDate("");
-      setSelectedSlotId(null);
-      setSlotRangeEndId(null);
+      setSelectedSlotIds([]);
       return;
     }
 
@@ -72,8 +89,7 @@ function ReservationForm({
         if (selectedDate && dates[selectedDate]?.isFullyBooked) {
           setSelectedDate("");
           setSlotsData(null);
-          setSelectedSlotId(null);
-          setSlotRangeEndId(null);
+          setSelectedSlotIds([]);
           setStartTime("");
           setEndTime("");
           setFormError(
@@ -95,6 +111,7 @@ function ReservationForm({
   useEffect(() => {
     if (!resourceId || !selectedDate) {
       setSlotsData(null);
+      setSelectedSlotIds([]);
       return;
     }
 
@@ -104,6 +121,7 @@ function ReservationForm({
         setFormError("");
         const res = await getResourceSlots(resourceId, selectedDate);
         setSlotsData(res.data);
+        setSelectedSlotIds([]); // Clear previous slot selections for new date
       } catch (err) {
         console.error("Failed to fetch slots for date:", err);
         setFormError("Could not load time slots for this date.");
@@ -114,6 +132,24 @@ function ReservationForm({
 
     fetchSlots();
   }, [resourceId, selectedDate]);
+
+  // Update legacy startTime / endTime when selectedSlotIds change
+  useEffect(() => {
+    if (!slotsData || selectedSlotIds.length === 0) {
+      setStartTime("");
+      setEndTime("");
+      return;
+    }
+
+    const selectedSlots = (slotsData.slots || [])
+      .filter((s) => selectedSlotIds.includes(s.id))
+      .sort((a, b) => a.id - b.id);
+
+    if (selectedSlots.length > 0) {
+      setStartTime(selectedSlots[0].startDateTime);
+      setEndTime(selectedSlots[selectedSlots.length - 1].endDateTime);
+    }
+  }, [selectedSlotIds, slotsData]);
 
   // Month navigation
   const handlePrevMonth = () => {
@@ -147,10 +183,11 @@ function ReservationForm({
     ).padStart(2, "0")}`;
     const isPast = dayStr < todayStr;
     const isToday = dayStr === todayStr;
+    const isBeyond15Days = dayStr > maxAdvanceStr;
     const dayData = availabilityMap[dayStr];
     const isFullyBooked = dayData ? dayData.isFullyBooked : false;
-    const availableCount = dayData ? dayData.availableSlots : null;
-    const bookedCount = dayData ? dayData.bookedSlots : null;
+    const availableCount = dayData ? dayData.availableSlots : (isPast || isBeyond15Days ? 0 : 10);
+    const bookedCount = dayData ? dayData.bookedSlots : 0;
 
     calendarDays.push({
       isEmpty: false,
@@ -158,6 +195,7 @@ function ReservationForm({
       dateStr: dayStr,
       isPast,
       isToday,
+      isBeyond15Days,
       isFullyBooked,
       availableCount,
       bookedCount,
@@ -169,57 +207,99 @@ function ReservationForm({
   // Handle clicking a date cell
   const handleSelectDate = (day) => {
     if (day.isPast) return;
+    if (day.isBeyond15Days) {
+      setFormError(
+        `Advance booking is only allowed up to 15 days (${maxAdvanceStr}).`
+      );
+      return;
+    }
     if (day.isFullyBooked) {
       setFormError(
-        `All slots for ${day.dateStr} are booked. Please select an available date.`
+        `All 10 slots for ${day.dateStr} are already booked. Please choose another date.`
       );
       return;
     }
 
     setFormError("");
     setSelectedDate(day.dateStr);
-    setSelectedSlotId(null);
-    setSlotRangeEndId(null);
-    setStartTime("");
-    setEndTime("");
+    setSelectedSlotIds([]);
   };
 
-  // Handle clicking an available time slot
-  const handleSlotClick = (slot) => {
-    if (slot.isBooked) return;
+  // Slot selection handlers
+  const toggleSlot = (slotId) => {
+    const slot = (slotsData?.slots || []).find((s) => s.id === slotId);
+    if (!slot || slot.isBooked) return;
 
-    if (!selectedSlotId || slotRangeEndId || slot.id === selectedSlotId) {
-      // Single slot selection
-      setSelectedSlotId(slot.id);
-      setSlotRangeEndId(null);
-      setStartTime(`${selectedDate} ${slot.startTime}:00`);
-      setEndTime(`${selectedDate} ${slot.endTime}:00`);
-      setFormError("");
-    } else {
-      // User clicked a second slot: determine range
-      const slots = slotsData?.slots || [];
-      const startId = Math.min(selectedSlotId, slot.id);
-      const endId = Math.max(selectedSlotId, slot.id);
-
-      // Verify that all slots between startId and endId are available
-      const rangeSlots = slots.filter((s) => s.id >= startId && s.id <= endId);
-      const hasBooked = rangeSlots.some((s) => s.isBooked);
-
-      if (hasBooked) {
-        // Can't select range with booked slot inside; fall back to single slot
-        setSelectedSlotId(slot.id);
-        setSlotRangeEndId(null);
-        setStartTime(`${selectedDate} ${slot.startTime}:00`);
-        setEndTime(`${selectedDate} ${slot.endTime}:00`);
+    setSelectedSlotIds((prev) => {
+      if (prev.includes(slotId)) {
+        return prev.filter((id) => id !== slotId);
       } else {
-        setSelectedSlotId(startId);
-        setSlotRangeEndId(endId);
-        const first = rangeSlots[0];
-        const last = rangeSlots[rangeSlots.length - 1];
-        setStartTime(`${selectedDate} ${first.startTime}:00`);
-        setEndTime(`${selectedDate} ${last.endTime}:00`);
-        setFormError("");
+        return [...prev, slotId].sort((a, b) => a - b);
       }
+    });
+    setFormError("");
+  };
+
+  const handleSelectAllAvailable = () => {
+    if (!slotsData?.slots) return;
+    const availableIds = slotsData.slots
+      .filter((s) => !s.isBooked)
+      .map((s) => s.id);
+    setSelectedSlotIds(availableIds);
+    setFormError("");
+  };
+
+  const handleClearSelection = () => {
+    setSelectedSlotIds([]);
+    setFormError("");
+  };
+
+  // Book a single slot immediately
+  const handleBookSingleSlot = async (slot) => {
+    if (!slot || slot.isBooked) return;
+    try {
+      setBookingInProgress(true);
+      setFormError("");
+      const singleSlotPayload = [
+        {
+          start_time: slot.startDateTime,
+          end_time: slot.endDateTime,
+          label: slot.label,
+        },
+      ];
+      await makeReservation(singleSlotPayload);
+    } catch (err) {
+      console.error(err);
+      setFormError("Failed to book slot. Please try again.");
+    } finally {
+      setBookingInProgress(false);
+    }
+  };
+
+  // Book all selected slots (multiple slots)
+  const handleBookSelectedSlots = async () => {
+    if (selectedSlotIds.length === 0) {
+      setFormError("Please select at least one available slot from the table.");
+      return;
+    }
+
+    const selectedSlots = (slotsData?.slots || [])
+      .filter((s) => selectedSlotIds.includes(s.id))
+      .map((s) => ({
+        start_time: s.startDateTime,
+        end_time: s.endDateTime,
+        label: s.label,
+      }));
+
+    try {
+      setBookingInProgress(true);
+      setFormError("");
+      await makeReservation(selectedSlots);
+    } catch (err) {
+      console.error(err);
+      setFormError("Failed to book reservations. Please try again.");
+    } finally {
+      setBookingInProgress(false);
     }
   };
 
@@ -229,28 +309,27 @@ function ReservationForm({
     year: "numeric",
   });
 
-  // Calculate formatted summary for selected time
-  const getSelectedTimeSummary = () => {
-    if (!slotsData || !selectedSlotId) return null;
-    const slots = slotsData.slots || [];
-    if (!slotRangeEndId) {
-      const slot = slots.find((s) => s.id === selectedSlotId);
-      return slot ? `${slot.label} (1 Hour)` : null;
-    } else {
-      const first = slots.find((s) => s.id === selectedSlotId);
-      const last = slots.find((s) => s.id === slotRangeEndId);
-      if (!first || !last) return null;
-      const count = slotRangeEndId - selectedSlotId + 1;
-      return `${first.startTime} to ${last.endTime} (${count} Hours)`;
-    }
-  };
+  const availableSlotsList = (slotsData?.slots || []).filter((s) => !s.isBooked);
+  const allAvailableSelected =
+    availableSlotsList.length > 0 &&
+    availableSlotsList.every((s) => selectedSlotIds.includes(s.id));
+
+  // Formatted date string for header
+  const formattedSelectedDate = selectedDate
+    ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
 
   return (
     <div className="reservation-booking-wrapper">
       <div className="reservation-header-box">
         <h2>📅 Book a College Resource</h2>
         <p className="reservation-subtext">
-          Select a resource, pick an open date, and choose an available time slot.
+          Resources are available daily from <strong>8:00 AM to 6:00 PM</strong> in <strong>1-hour slots</strong>. Advance booking is available up to <strong>15 days</strong>.
         </p>
       </div>
 
@@ -263,15 +342,7 @@ function ReservationForm({
         <select
           className="resource-dropdown"
           value={resourceId}
-          onChange={(e) => {
-            setResourceId(e.target.value);
-            setSelectedDate("");
-            setSlotsData(null);
-            setSelectedSlotId(null);
-            setSlotRangeEndId(null);
-            setStartTime("");
-            setEndTime("");
-          }}
+          onChange={(e) => handleResourceChange(e.target.value)}
         >
           <option value="">-- Choose an Available Resource --</option>
           {resources
@@ -288,9 +359,21 @@ function ReservationForm({
             <span className="meta-chip">📍 {selectedResource.location}</span>
             <span className="meta-chip">👥 Capacity: {selectedResource.capacity}</span>
             <span className="meta-chip">✨ {selectedResource.facilities}</span>
+            <span className="meta-chip operating-hours-chip">⏰ Operating Hours: 8:00 AM - 6:00 PM</span>
           </div>
         )}
       </div>
+
+      {/* PROMPT TO SELECT RESOURCE */}
+      {!resourceId && (
+        <div className="step-placeholder-box">
+          <span className="placeholder-icon">👉</span>
+          <div>
+            <strong>Step 2 & 3: Calendar & Slots</strong>
+            <p>Please select a college resource above to view its availability calendar and bookable slots.</p>
+          </div>
+        </div>
+      )}
 
       {/* STEP 2: SELECT DATE (CALENDAR VIEW) */}
       {resourceId && (
@@ -300,12 +383,17 @@ function ReservationForm({
             <div>
               <label className="step-label">Select Booking Date</label>
               <span className="step-hint">
-                Dates with all slots booked are disabled.
+                You can book up to <strong>15 days in advance</strong> ({todayStr} to {maxAdvanceStr}). Fully booked dates are disabled.
               </span>
             </div>
             {loadingAvailability && (
               <span className="loading-indicator-inline">Loading availability...</span>
             )}
+          </div>
+
+          <div className="advance-booking-notice-bar">
+            <span>🗓️ <strong>15-Day Booking Window:</strong> Today ({today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}) through {maxAdvanceDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            <span className="operating-tag">Daily 8:00 AM – 6:00 PM (10 slots)</span>
           </div>
 
           {/* CALENDAR WIDGET */}
@@ -347,11 +435,14 @@ function ReservationForm({
                   );
                 }
 
-                const isDisabled = day.isPast || day.isFullyBooked;
+                const isDisabled = day.isPast || day.isBeyond15Days || day.isFullyBooked;
 
                 let cellClass = "calendar-day-cell";
                 if (day.isPast) cellClass += " past-day";
-                if (day.isFullyBooked) cellClass += " fully-booked-day disabled";
+                if (day.isBeyond15Days) cellClass += " beyond-window-day disabled";
+                if (day.isFullyBooked && !day.isPast && !day.isBeyond15Days) {
+                  cellClass += " fully-booked-day disabled";
+                }
                 if (day.isSelected) cellClass += " selected-day";
                 if (day.isToday) cellClass += " today-day";
                 if (!isDisabled && !day.isSelected) cellClass += " available-day";
@@ -366,25 +457,39 @@ function ReservationForm({
                     title={
                       day.isPast
                         ? "Past date"
+                        : day.isBeyond15Days
+                        ? "Beyond 15-day advance booking window"
                         : day.isFullyBooked
-                        ? `Fully Booked - All ${day.bookedCount || 10} slots reserved`
-                        : `${day.availableCount ?? "Multiple"} slots available`
+                        ? `Fully Booked - All 10 slots reserved`
+                        : `${day.availableCount ?? 10} slots remaining out of 10`
                     }
                   >
                     <span className="day-number">{day.dayNumber}</span>
 
-                    {/* Status Badge inside Day Tile */}
-                    {day.isFullyBooked && !day.isPast && (
+                    {/* Past Date Pill */}
+                    {day.isPast && (
+                      <span className="day-pill-status past-pill">Past</span>
+                    )}
+
+                    {/* Beyond 15-day limit Pill */}
+                    {day.isBeyond15Days && !day.isPast && (
+                      <span className="day-pill-status beyond-pill">&gt;15d</span>
+                    )}
+
+                    {/* Fully Booked Pill */}
+                    {day.isFullyBooked && !day.isPast && !day.isBeyond15Days && (
                       <span className="day-pill-status fully-booked-pill">
-                        Full
+                        0 left
                       </span>
                     )}
 
+                    {/* Remaining Slots Pill */}
                     {!day.isPast &&
+                      !day.isBeyond15Days &&
                       !day.isFullyBooked &&
                       day.availableCount !== null && (
                         <span className="day-pill-status open-pill">
-                          {day.availableCount} open
+                          {day.availableCount} left
                         </span>
                       )}
                   </button>
@@ -396,11 +501,15 @@ function ReservationForm({
             <div className="calendar-legend-bar">
               <div className="legend-item">
                 <span className="legend-dot available-dot"></span>
-                <span>Available</span>
+                <span>Available (Slots remaining shown)</span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot booked-dot"></span>
-                <span>Fully Booked (Disabled)</span>
+                <span>Fully Booked (0 left / Disabled)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot beyond-dot"></span>
+                <span>&gt;15 Days (Advance limit)</span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot selected-dot"></span>
@@ -408,28 +517,30 @@ function ReservationForm({
               </div>
               <div className="legend-item">
                 <span className="legend-dot past-dot"></span>
-                <span>Past</span>
+                <span>Past Date</span>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 3: SLOT AVAILABILITY BREAKDOWN & SLOT SELECTION */}
+      {/* STEP 3: SLOT AVAILABILITY TABLE & MULTI-SLOT SELECTION */}
       {resourceId && selectedDate && (
         <div className="reservation-step-card slot-section-card">
           <div className="step-badge">Step 3</div>
-          <label className="step-label">
-            Slot Availability for{" "}
-            <strong>
-              {new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </strong>
-          </label>
+          <div className="slots-header-container">
+            <div>
+              <label className="step-label">
+                Available Slots for <strong>{selectedResource?.name}</strong>
+              </label>
+              <div className="selected-date-badge-large">
+                📅 {formattedSelectedDate}
+              </div>
+            </div>
+            <span className="slot-instruction-hint">
+              Each slot is <strong>1 hour</strong>. You can book a particular slot or check multiple slots of this date!
+            </span>
+          </div>
 
           {loadingSlots ? (
             <div className="slot-loading-state">
@@ -446,134 +557,249 @@ function ReservationForm({
                 </div>
 
                 <div className="slot-stat-card booked-stat">
-                  <span className="stat-label">Booked Slots</span>
+                  <span className="stat-label">Already Booked</span>
                   <span className="stat-value">{slotsData.bookedSlots}</span>
-                  <span className="stat-sub">Already reserved</span>
+                  <span className="stat-sub">Reserved by others</span>
+                </div>
+
+                <div className="slot-stat-card selected-stat">
+                  <span className="stat-label">Selected Slots</span>
+                  <span className="stat-value">{selectedSlotIds.length}</span>
+                  <span className="stat-sub">Your current selection</span>
                 </div>
 
                 <div className="slot-stat-card total-stat">
-                  <span className="stat-label">Total Slots</span>
+                  <span className="stat-label">Daily Capacity</span>
                   <span className="stat-value">{slotsData.totalSlots}</span>
-                  <span className="stat-sub">College operating hours</span>
+                  <span className="stat-sub">8:00 AM to 6:00 PM</span>
                 </div>
               </div>
 
-              {/* AVAILABILITY PROGRESS BAR */}
-              <div className="availability-bar-wrapper">
-                <div className="availability-bar-labels">
-                  <span>Occupancy</span>
-                  <span>
-                    {Math.round(
-                      (slotsData.bookedSlots / slotsData.totalSlots) * 100
-                    )}
-                    % Booked
+              {/* MULTI-SLOT SELECTION TOOLBAR */}
+              <div className="slot-table-toolbar">
+                <div className="toolbar-info">
+                  <strong>Time Slots Table</strong>
+                  <span className="table-sub-note">
+                    Checkboxes allow selecting multiple slots of this date.
                   </span>
                 </div>
-                <div className="availability-progress-track">
-                  <div
-                    className="availability-progress-fill"
-                    style={{
-                      width: `${
-                        (slotsData.bookedSlots / slotsData.totalSlots) * 100
-                      }%`,
-                    }}
-                  ></div>
+                <div className="toolbar-actions">
+                  <button
+                    type="button"
+                    className="btn-toolbar-select-all"
+                    onClick={handleSelectAllAvailable}
+                    disabled={availableSlotsList.length === 0}
+                  >
+                    Select All Available ({availableSlotsList.length})
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-toolbar-clear"
+                    onClick={handleClearSelection}
+                    disabled={selectedSlotIds.length === 0}
+                  >
+                    Clear Selection
+                  </button>
                 </div>
               </div>
 
-              {/* TIME SLOTS GRID */}
-              <div className="slots-picker-header">
-                <h4>Choose an Available Slot:</h4>
-                <span className="slot-instruction-hint">
-                  Click an available slot to book. (Click a second slot to select consecutive hours)
-                </span>
+              {/* TABLE FORMAT FOR TIME SLOTS */}
+              <div className="slots-table-wrapper">
+                <table className="slots-table">
+                  <thead>
+                    <tr>
+                      <th className="th-checkbox">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all available slots"
+                          checked={allAvailableSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) handleSelectAllAvailable();
+                            else handleClearSelection();
+                          }}
+                          disabled={availableSlotsList.length === 0}
+                        />
+                      </th>
+                      <th className="th-index">#</th>
+                      <th className="th-time">Time Slot</th>
+                      <th className="th-duration">Duration</th>
+                      <th className="th-status">Availability Status</th>
+                      <th className="th-action">Action / Booking</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {slotsData.slots.map((slot, index) => {
+                      const isBooked = slot.isBooked;
+                      const isSelected = selectedSlotIds.includes(slot.id);
+
+                      let rowClass = "slot-row";
+                      if (isBooked) rowClass += " slot-row-booked";
+                      else if (isSelected) rowClass += " slot-row-selected";
+                      else rowClass += " slot-row-available";
+
+                      return (
+                        <tr
+                          key={slot.id}
+                          className={rowClass}
+                          onClick={(e) => {
+                            // Only toggle if not clicking the direct action button
+                            if (
+                              !isBooked &&
+                              !e.target.closest("button") &&
+                              !e.target.closest("input")
+                            ) {
+                              toggleSlot(slot.id);
+                            }
+                          }}
+                        >
+                          {/* Checkbox column */}
+                          <td className="td-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              disabled={isBooked}
+                              onChange={() => toggleSlot(slot.id)}
+                              aria-label={`Select slot ${slot.label}`}
+                            />
+                          </td>
+
+                          {/* Index column */}
+                          <td className="td-index">
+                            <span className="slot-num-badge">Slot {index + 1}</span>
+                          </td>
+
+                          {/* Time window column */}
+                          <td className="td-time">
+                            <div className="slot-time-cell">
+                              <span className="slot-clock-icon">🕒</span>
+                              <span className={`slot-time-label ${isBooked ? "time-booked-strikethrough" : ""}`}>
+                                {slot.label}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Duration column */}
+                          <td className="td-duration">
+                            <span className="duration-pill">1 Hour</span>
+                          </td>
+
+                          {/* Status column */}
+                          <td className="td-status">
+                            {isBooked ? (
+                              <span className="status-badge-booked">
+                                🔒 Already Booked
+                              </span>
+                            ) : (
+                              <span className="status-badge-available">
+                                🟢 Available
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Action column */}
+                          <td className="td-action">
+                            {isBooked ? (
+                              <span className="action-text-booked">
+                                Already Booked
+                              </span>
+                            ) : (
+                              <div className="slot-actions-cell">
+                                <button
+                                  type="button"
+                                  className={`btn-toggle-slot ${
+                                    isSelected ? "btn-toggle-selected" : "btn-toggle-unselected"
+                                  }`}
+                                  onClick={() => toggleSlot(slot.id)}
+                                >
+                                  {isSelected ? "✓ Selected" : "+ Select"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-book-instant"
+                                  disabled={bookingInProgress}
+                                  onClick={() => handleBookSingleSlot(slot)}
+                                  title="Book this particular slot directly"
+                                >
+                                  Book Slot
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              <div className="slots-grid">
-                {slotsData.slots.map((slot) => {
-                  const isBooked = slot.isBooked;
-
-                  // Check if this slot is selected or inside selected range
-                  let isSelected = false;
-                  if (selectedSlotId) {
-                    if (!slotRangeEndId) {
-                      isSelected = slot.id === selectedSlotId;
-                    } else {
-                      isSelected =
-                        slot.id >= selectedSlotId && slot.id <= slotRangeEndId;
-                    }
-                  }
-
-                  let slotBtnClass = "slot-chip-btn";
-                  if (isBooked) slotBtnClass += " slot-booked";
-                  else if (isSelected) slotBtnClass += " slot-selected";
-                  else slotBtnClass += " slot-available";
-
-                  return (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      disabled={isBooked}
-                      className={slotBtnClass}
-                      onClick={() => handleSlotClick(slot)}
-                      title={
-                        isBooked
-                          ? "This time slot is already reserved"
-                          : `Click to select ${slot.label}`
-                      }
-                    >
-                      <div className="slot-chip-main">
-                        <span className="slot-clock-icon">🕒</span>
-                        <span className="slot-time-text">{slot.label}</span>
+              {/* SELECTION SUMMARY & MULTI-SLOT BOOKING SUBMIT */}
+              <div className="selected-slots-summary-card">
+                <div className="summary-card-header">
+                  <div className="summary-left">
+                    <span className="sparkle-icon">✨</span>
+                    <div>
+                      <strong>
+                        {selectedSlotIds.length === 0
+                          ? "No slots selected yet"
+                          : `${selectedSlotIds.length} Slot(s) Selected for ${formattedSelectedDate}`}
+                      </strong>
+                      <div className="selected-slots-tags-list">
+                        {selectedSlotIds.length === 0 ? (
+                          <span className="no-selection-hint">
+                            Check one or multiple slots in the table above to book them together.
+                          </span>
+                        ) : (
+                          slotsData.slots
+                            .filter((s) => selectedSlotIds.includes(s.id))
+                            .map((s) => (
+                              <span key={s.id} className="selected-slot-tag">
+                                🕒 {s.label}
+                                <button
+                                  type="button"
+                                  className="remove-slot-btn"
+                                  onClick={() => toggleSlot(s.id)}
+                                  title="Remove slot"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))
+                        )}
                       </div>
-                      <span className="slot-badge-status">
-                        {isBooked
-                          ? "🔒 Booked"
-                          : isSelected
-                          ? "✓ Selected"
-                          : "🟢 Available"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* SELECTED TIME PREVIEW */}
-              {selectedSlotId && (
-                <div className="selected-slot-preview-card">
-                  <div className="preview-icon">✨</div>
-                  <div className="preview-info">
-                    <strong>Selected Time Slot:</strong>
-                    <span>
-                      {getSelectedTimeSummary()} on {selectedDate}
-                    </span>
+                    </div>
                   </div>
+
+                  {selectedSlotIds.length > 0 && (
+                    <div className="summary-total-hours">
+                      <span>Total Duration:</span>
+                      <strong>{selectedSlotIds.length} Hour{selectedSlotIds.length > 1 ? "s" : ""}</strong>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                <div className="summary-card-footer">
+                  <button
+                    type="button"
+                    className="reserve-submit-btn"
+                    disabled={selectedSlotIds.length === 0 || bookingInProgress}
+                    onClick={handleBookSelectedSlots}
+                  >
+                    {bookingInProgress
+                      ? "Booking Reservation..."
+                      : selectedSlotIds.length === 0
+                      ? "Select Slots from Table to Book"
+                      : selectedSlotIds.length === 1
+                      ? "Confirm & Book 1 Selected Slot 🚀"
+                      : `Confirm & Book All ${selectedSlotIds.length} Selected Slots 🚀`}
+                  </button>
+                </div>
+              </div>
             </>
           ) : (
-            <p className="no-slots-notice">No slot information available.</p>
+            <p className="no-slots-notice">No slot information available for this date.</p>
           )}
         </div>
       )}
-
-      {/* CONFIRM / SUBMIT BUTTON */}
-      <div className="reservation-submit-footer">
-        <button
-          type="button"
-          className="reserve-submit-btn"
-          disabled={!resourceId || !selectedDate || !startTime || !endTime}
-          onClick={makeReservation}
-        >
-          {!resourceId
-            ? "1. Select a Resource First"
-            : !selectedDate
-            ? "2. Select an Available Date"
-            : !startTime
-            ? "3. Select an Available Time Slot"
-            : "Confirm & Reserve Resource 🚀"}
-        </button>
-      </div>
     </div>
   );
 }

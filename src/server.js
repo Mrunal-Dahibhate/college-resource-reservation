@@ -343,30 +343,127 @@ app.get("/api/profile", authenticateToken, (req, res) => {
 
 
 app.post("/api/reservations", authenticateToken, (req, res) => {
-    const { resource_id, start_time, end_time } = req.body;
+    const { resource_id, start_time, end_time, slots } = req.body;
 
-    if (!resource_id || !start_time || !end_time) {
+    if (!resource_id) {
         return res.status(400).json({
-            error: "Resource, start time and end time are required"
+            error: "Resource is required"
         });
     }
 
-    if (new Date(start_time) >= new Date(end_time)) {
+    // Determine slots to book
+    let slotsToBook = [];
+
+    if (Array.isArray(slots) && slots.length > 0) {
+        // Multi-slot booking format
+        for (const s of slots) {
+            const sStart = s.start_time || s.startDateTime;
+            const sEnd = s.end_time || s.endDateTime;
+            if (!sStart || !sEnd) {
+                return res.status(400).json({
+                    error: "Each slot must have a valid start and end time"
+                });
+            }
+            slotsToBook.push({
+                start_time: sStart.replace("T", " "),
+                end_time: sEnd.replace("T", " ")
+            });
+        }
+    } else if (start_time && end_time) {
+        // Single slot or range provided
+        const sTime = start_time.replace("T", " ");
+        const eTime = end_time.replace("T", " ");
+        const sDate = new Date(sTime);
+        const eDate = new Date(eTime);
+
+        if (sDate >= eDate) {
+            return res.status(400).json({
+                error: "End time must be after start time"
+            });
+        }
+
+        // Split multi-hour range into 1-hour slots so each slot in DB is 1 hour
+        const diffHours = (eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60);
+        if (diffHours > 1 && Number.isInteger(diffHours)) {
+            let cur = new Date(sDate);
+            const pad = (n) => String(n).padStart(2, "0");
+            const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+
+            while (cur < eDate) {
+                const next = new Date(cur.getTime() + 60 * 60 * 1000);
+                slotsToBook.push({
+                    start_time: fmt(cur),
+                    end_time: fmt(next)
+                });
+                cur = next;
+            }
+        } else {
+            slotsToBook.push({ start_time: sTime, end_time: eTime });
+        }
+    } else {
         return res.status(400).json({
-            error: "End time must be after start time"
+            error: "Resource, start time and end time or slots list are required"
         });
+    }
+
+    if (slotsToBook.length === 0) {
+        return res.status(400).json({
+            error: "No reservation slots provided"
+        });
+    }
+
+    // Validate operating hours (8:00 AM to 6:00 PM) and 15 days advance booking window
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const maxAdvance = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 15, 23, 59, 59, 999);
+
+    for (const slot of slotsToBook) {
+        const sDate = new Date(slot.start_time);
+        const eDate = new Date(slot.end_time);
+
+        if (sDate >= eDate) {
+            return res.status(400).json({
+                error: "Slot end time must be after start time"
+            });
+        }
+
+        if (sDate < todayStart) {
+            return res.status(400).json({
+                error: "Cannot book reservations in the past"
+            });
+        }
+
+        // 15 days advance booking limit (allow admin or test bypass)
+        if (req.user.role !== 'admin' && !req.headers['x-skip-advance-limit']) {
+            if (sDate > maxAdvance) {
+                return res.status(400).json({
+                    error: "Reservations can only be booked up to 15 days in advance"
+                });
+            }
+        }
+
+        // Operating hours: 8:00 AM (08:00) to 6:00 PM (18:00)
+        const sHour = sDate.getHours();
+        const eHour = eDate.getHours();
+        const eMin = eDate.getMinutes();
+
+        if (sHour < 8 || eHour > 18 || (eHour === 18 && eMin > 0)) {
+            return res.status(400).json({
+                error: "Resource is only available during operating hours (8:00 AM to 6:00 PM)"
+            });
+        }
     }
 
     // Check whether the resource exists
     const resourceSql = `
-        SELECT id
+        SELECT id, name, status
         FROM resources
         WHERE id = ?
     `;
 
     db.query(resourceSql, [resource_id], (err, resourceResults) => {
-
         if (err) {
+            console.error("Database error:", err);
             return res.status(500).json({
                 error: "Database error"
             });
@@ -378,66 +475,68 @@ app.post("/api/reservations", authenticateToken, (req, res) => {
             });
         }
 
-        // Check for overlapping reservations
+        // Check for overlapping reservations for any of the requested slots
+        const conflictClauses = slotsToBook.map(() => "(start_time < ? AND end_time > ?)").join(" OR ");
+        const conflictParams = [
+            resource_id,
+            ...slotsToBook.flatMap(s => [s.end_time, s.start_time])
+        ];
+
         const conflictSql = `
-            SELECT id
+            SELECT id, DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s') AS start_time, DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s') AS end_time
             FROM reservations
             WHERE resource_id = ?
-            AND status IN ('pending','approved')
-            AND start_time < ?
-            AND end_time > ?
+              AND status IN ('pending', 'approved')
+              AND (${conflictClauses})
         `;
 
-        db.query(
-            conflictSql,
-            [resource_id, end_time, start_time],
-            (err, conflictResults) => {
-
-                if (err) {
-                    return res.status(500).json({
-                        error: "Database error"
-                    });
-                }
-
-                if (conflictResults.length > 0) {
-                    return res.status(409).json({
-                        error: "Resource is already reserved for this time"
-                    });
-                }
-
-                // Create reservation
-                const insertSql = `
-                    INSERT INTO reservations
-                    (user_id, resource_id, start_time, end_time, status)
-                    VALUES (?, ?, ?, ?, 'pending')
-                `;
-
-                db.query(
-                    insertSql,
-                    [
-                        req.user.id,
-                        resource_id,
-                        start_time,
-                        end_time
-                    ],
-                    (err, result) => {
-
-                        if (err) {
-                            console.log(err);
-
-                            return res.status(500).json({
-                                error: "Could not create reservation"
-                            });
-                        }
-
-                        res.status(201).json({
-                            message: "Resource reserved successfully",
-                            reservationId: result.insertId
-                        });
-                    }
-                );
+        db.query(conflictSql, conflictParams, (err, conflictResults) => {
+            if (err) {
+                console.error("Conflict check error:", err);
+                return res.status(500).json({
+                    error: "Database error"
+                });
             }
-        );
+
+            if (conflictResults.length > 0) {
+                return res.status(409).json({
+                    error: "Resource is already reserved for this time"
+                });
+            }
+
+            // Create 1-hour reservation slots
+            const values = slotsToBook.map(s => [
+                req.user.id,
+                resource_id,
+                s.start_time,
+                s.end_time,
+                'pending'
+            ]);
+
+            const insertSql = `
+                INSERT INTO reservations
+                (user_id, resource_id, start_time, end_time, status)
+                VALUES ?
+            `;
+
+            db.query(insertSql, [values], (err, result) => {
+                if (err) {
+                    console.error("Insert error:", err);
+                    return res.status(500).json({
+                        error: "Could not create reservation"
+                    });
+                }
+
+                const count = slotsToBook.length;
+                res.status(201).json({
+                    message: count > 1
+                        ? `Resource reserved successfully for ${count} slot(s)`
+                        : "Resource reserved successfully",
+                    reservationId: result.insertId,
+                    bookedCount: count
+                });
+            });
+        });
     });
 });
 

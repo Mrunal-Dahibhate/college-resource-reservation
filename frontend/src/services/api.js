@@ -62,18 +62,25 @@ export const getResourceAvailability = (
 
 export const createReservation = (
   resourceId,
-  startTime,
-  endTime
+  startTime = null,
+  endTime = null,
+  slots = null
 ) => {
-  return axios.post(
-    `${API}/api/reservations`,
-    {
-      resource_id: Number(resourceId),
-      start_time: startTime.replace("T", " "),
-      end_time: endTime.replace("T", " "),
-    },
-    authConfig()
-  );
+  const payload = {
+    resource_id: Number(resourceId),
+  };
+
+  if (Array.isArray(slots) && slots.length > 0) {
+    payload.slots = slots.map((s) => ({
+      start_time: (s.start_time || s.startDateTime || "").replace("T", " "),
+      end_time: (s.end_time || s.endDateTime || "").replace("T", " "),
+    }));
+  } else if (startTime && endTime) {
+    payload.start_time = startTime.replace("T", " ");
+    payload.end_time = endTime.replace("T", " ");
+  }
+
+  return axios.post(`${API}/api/reservations`, payload, authConfig());
 };
 
 export const getMyReservations = () => {

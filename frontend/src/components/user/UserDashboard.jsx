@@ -79,48 +79,49 @@ function UserDashboard({ user, logout }) {
     }
   };
 
-  const makeReservation = async () => {
-  if (!resourceId || !startTime || !endTime) {
-    setMessage("Please fill all reservation fields.");
-    return;
-  }
+  const makeReservation = async (slotsToBook) => {
+    if (!resourceId) {
+      setMessage("Please select a resource first.");
+      return;
+    }
 
-  if (new Date(startTime) >= new Date(endTime)) {
-    setMessage("End time must be after start time.");
-    return;
-  }
+    try {
+      let response;
 
-  try {
-    const response = await createReservation(
-      resourceId,
-      startTime,
-      endTime
-    );
+      if (Array.isArray(slotsToBook) && slotsToBook.length > 0) {
+        response = await createReservation(resourceId, null, null, slotsToBook);
+      } else if (startTime && endTime) {
+        if (new Date(startTime) >= new Date(endTime)) {
+          setMessage("End time must be after start time.");
+          return;
+        }
+        response = await createReservation(resourceId, startTime, endTime);
+      } else {
+        setMessage("Please select at least one available time slot.");
+        return;
+      }
 
-    // Clear form
-    setResourceId("");
-    setStartTime("");
-    setEndTime("");
+      // Clear form
+      setResourceId("");
+      setStartTime("");
+      setEndTime("");
 
-    // Close reservation form
-    setShowReservationForm(false);
+      // Close reservation form
+      setShowReservationForm(false);
 
-    // Load updated reservations
-    await viewReservations();
+      // Load updated reservations
+      await viewReservations();
 
-    // Show success message
-    setMessage(
-      response.data.message ||
-        "Reservation created successfully!"
-    );
-
-  } catch (error) {
-    setMessage(
-      error.response?.data?.error ||
-        "Could not create reservation"
-    );
-  }
-};
+      // Show success message
+      setMessage(
+        response.data?.message || "Reservation created successfully!"
+      );
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || "Could not create reservation"
+      );
+    }
+  };
 
 
 const viewReservations = async () => {
