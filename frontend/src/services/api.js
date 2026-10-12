@@ -34,6 +34,32 @@ export const getResources = () => {
   );
 };
 
+export const getResourceSlots = (resourceId, date) => {
+  return axios.get(
+    `${API}/api/resources/${resourceId}/slots?date=${date}`,
+    authConfig()
+  );
+};
+
+export const getResourceAvailability = (
+  resourceId,
+  startDate,
+  endDate,
+  month
+) => {
+  let url = `${API}/api/resources/${resourceId}/availability`;
+  const params = [];
+  if (startDate && endDate) {
+    params.push(`startDate=${startDate}`, `endDate=${endDate}`);
+  } else if (month) {
+    params.push(`month=${month}`);
+  }
+  if (params.length > 0) {
+    url += `?${params.join("&")}`;
+  }
+  return axios.get(url, authConfig());
+};
+
 export const createReservation = (
   resourceId,
   startTime,

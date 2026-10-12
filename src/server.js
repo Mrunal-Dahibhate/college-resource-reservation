@@ -58,6 +58,178 @@ app.get("/api/resources", (req, res) => {
     });
 });
 
+// ==========================================
+// RESOURCE TIME SLOTS & AVAILABILITY
+// ==========================================
+const STANDARD_SLOTS = [
+    { id: 1, startTime: "08:00", endTime: "09:00", label: "08:00 AM - 09:00 AM" },
+    { id: 2, startTime: "09:00", endTime: "10:00", label: "09:00 AM - 10:00 AM" },
+    { id: 3, startTime: "10:00", endTime: "11:00", label: "10:00 AM - 11:00 AM" },
+    { id: 4, startTime: "11:00", endTime: "12:00", label: "11:00 AM - 12:00 PM" },
+    { id: 5, startTime: "12:00", endTime: "13:00", label: "12:00 PM - 01:00 PM" },
+    { id: 6, startTime: "13:00", endTime: "14:00", label: "01:00 PM - 02:00 PM" },
+    { id: 7, startTime: "14:00", endTime: "15:00", label: "02:00 PM - 03:00 PM" },
+    { id: 8, startTime: "15:00", endTime: "16:00", label: "03:00 PM - 04:00 PM" },
+    { id: 9, startTime: "16:00", endTime: "17:00", label: "04:00 PM - 05:00 PM" },
+    { id: 10, startTime: "17:00", endTime: "18:00", label: "05:00 PM - 06:00 PM" },
+];
+
+function computeSlotsForDate(dateStr, reservations) {
+    let bookedCount = 0;
+    const slots = STANDARD_SLOTS.map((slot) => {
+        const slotStart = `${dateStr} ${slot.startTime}:00`;
+        const slotEnd = `${dateStr} ${slot.endTime}:00`;
+
+        const isBooked = reservations.some((r) => {
+            return r.start_time < slotEnd && r.end_time > slotStart;
+        });
+
+        if (isBooked) {
+            bookedCount++;
+        }
+
+        return {
+            id: slot.id,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            startDateTime: slotStart,
+            endDateTime: slotEnd,
+            label: slot.label,
+            isBooked
+        };
+    });
+
+    const totalSlots = STANDARD_SLOTS.length;
+    const availableSlots = totalSlots - bookedCount;
+    const isFullyBooked = availableSlots === 0;
+
+    return {
+        date: dateStr,
+        totalSlots,
+        bookedSlots: bookedCount,
+        availableSlots,
+        isFullyBooked,
+        slots
+    };
+}
+
+// Get slot details for a specific resource on a given date
+app.get("/api/resources/:id/slots", (req, res) => {
+    const resourceId = req.params.id;
+    const date = req.query.date;
+
+    if (!date) {
+        return res.status(400).json({ error: "Date query parameter (YYYY-MM-DD) is required" });
+    }
+
+    const startOfDay = `${date} 00:00:00`;
+    const endOfDay = `${date} 23:59:59`;
+
+    const sql = `
+        SELECT 
+            id,
+            DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s') AS start_time,
+            DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s') AS end_time,
+            status
+        FROM reservations
+        WHERE resource_id = ?
+          AND status IN ('pending', 'approved')
+          AND start_time < ?
+          AND end_time > ?
+    `;
+
+    db.query(sql, [resourceId, endOfDay, startOfDay], (err, results) => {
+        if (err) {
+            console.error("Error fetching resource slots:", err);
+            return res.status(500).json({ error: "Database error" });
+        }
+
+        const data = computeSlotsForDate(date, results || []);
+        res.json({
+            resourceId: Number(resourceId),
+            ...data
+        });
+    });
+});
+
+// Get day-by-day availability summary for a resource over a date range / month
+app.get("/api/resources/:id/availability", (req, res) => {
+    const resourceId = req.params.id;
+    let { startDate, endDate, month } = req.query;
+
+    if (month && (!startDate || !endDate)) {
+        startDate = `${month}-01`;
+        const [year, m] = month.split("-").map(Number);
+        const lastDay = new Date(year, m, 0).getDate();
+        endDate = `${month}-${String(lastDay).padStart(2, "0")}`;
+    }
+
+    if (!startDate || !endDate) {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+
+        const pad = (n) => String(n).padStart(2, "0");
+        startDate = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`;
+        endDate = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+    }
+
+    const startDateTime = `${startDate} 00:00:00`;
+    const endDateTime = `${endDate} 23:59:59`;
+
+    const sql = `
+        SELECT 
+            id,
+            DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s') AS start_time,
+            DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s') AS end_time,
+            status
+        FROM reservations
+        WHERE resource_id = ?
+          AND status IN ('pending', 'approved')
+          AND start_time <= ?
+          AND end_time >= ?
+    `;
+
+    db.query(sql, [resourceId, endDateTime, startDateTime], (err, results) => {
+        if (err) {
+            console.error("Error fetching resource availability:", err);
+            return res.status(500).json({ error: "Database error" });
+        }
+
+        const reservations = results || [];
+        const datesAvailability = {};
+
+        const [sY, sM, sD] = startDate.split("-").map(Number);
+        const [eY, eM, eD] = endDate.split("-").map(Number);
+        const curr = new Date(Date.UTC(sY, sM - 1, sD));
+        const end = new Date(Date.UTC(eY, eM - 1, eD));
+
+        while (curr <= end) {
+            const y = curr.getUTCFullYear();
+            const m = String(curr.getUTCMonth() + 1).padStart(2, "0");
+            const d = String(curr.getUTCDate()).padStart(2, "0");
+            const dateStr = `${y}-${m}-${d}`;
+
+            const daySlotData = computeSlotsForDate(dateStr, reservations);
+            datesAvailability[dateStr] = {
+                totalSlots: daySlotData.totalSlots,
+                bookedSlots: daySlotData.bookedSlots,
+                availableSlots: daySlotData.availableSlots,
+                isFullyBooked: daySlotData.isFullyBooked
+            };
+
+            curr.setUTCDate(curr.getUTCDate() + 1);
+        }
+
+        res.json({
+            resourceId: Number(resourceId),
+            startDate,
+            endDate,
+            dates: datesAvailability
+        });
+    });
+});
+
 app.post("/api/register", async (req, res) => {
     const { name, email, password } = req.body;
 

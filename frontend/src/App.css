@@ -1202,111 +1202,650 @@ button:disabled {
   border-top: 1px solid #e5e7eb;
 }
 
-/* RESERVATION FORM */
+/* =========================================
+   RESERVATION FORM & CALENDAR SLOT PICKER
+========================================= */
 
-.reservation-form-card {
-  max-width: 550px;
-
+.reservation-booking-wrapper {
+  max-width: 740px;
   width: 100%;
-
-  margin: 35px auto;
-
-  background: rgba(255,255,255,0.96);
-
-  border: 1px solid #e5e7eb;
-
-  border-radius: 18px;
-
-  padding: 32px;
-
-  box-shadow:
-    0 10px 30px rgba(15,23,42,0.08);
+  margin: 30px auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 36px;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+  font-family: inherit;
 }
 
-.reservation-form-card h2 {
-  margin-top: 0;
-
-  color: #111827;
-
-  font-size: 23px;
+.reservation-header-box {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 16px;
 }
 
-.reservation-form-card label {
+.reservation-header-box h2 {
+  margin: 0 0 6px 0;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.reservation-subtext {
+  margin: 0;
+  color: #64748b;
+  font-size: 14.5px;
+}
+
+.reservation-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.reservation-step-card {
+  position: relative;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 22px;
+  transition: all 0.2s ease;
+}
+
+.step-badge {
+  display: inline-block;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+}
+
+.step-label {
   display: block;
-
-  margin-top: 18px;
-
-  margin-bottom: 7px;
-
-  color: #374151;
-
-  font-weight: 600;
-
-  font-size: 14px;
-}
-
-.reservation-form-card input,
-.reservation-form-card select {
-  width: 100%;
-
-  padding: 13px;
-
-  border: 1px solid #d1d5db;
-
-  border-radius: 9px;
-
-  font-size: 14px;
-
-  background: #f9fafb;
-
-  outline: none;
-}
-
-.reservation-form-card input:focus,
-.reservation-form-card select:focus {
-  border-color: #2563eb;
-
-  background: white;
-
-  box-shadow:
-    0 0 0 3px
-    rgba(37,99,235,0.1);
-}
-
-.reservation-form-card button {
-  width: 100%;
-
-  margin-top: 25px;
-
-  padding: 13px;
-
-  border: none;
-
-  border-radius: 9px;
-
-  background: linear-gradient(
-    135deg,
-    #2563eb,
-    #3b82f6
-  );
-
-  color: white;
-
   font-size: 15px;
-
-  font-weight: 600;
-
-  cursor: pointer;
-
-  transition: 0.2s;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
 }
 
-.reservation-form-card button:hover {
-  transform: translateY(-1px);
+.step-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
 
-  box-shadow:
-    0 8px 18px
-    rgba(37,99,235,0.25);
+.step-hint {
+  display: block;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: normal;
+  margin-top: 2px;
+}
+
+.loading-indicator-inline {
+  font-size: 12.5px;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.resource-dropdown {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.resource-dropdown:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.resource-meta-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.meta-chip {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* =========================================
+   CALENDAR WIDGET
+========================================= */
+
+.calendar-widget {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.calendar-nav-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.calendar-month-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.calendar-nav-btn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.calendar-nav-btn:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.calendar-weekday-cell {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  padding-bottom: 8px;
+}
+
+.calendar-day-cell {
+  position: relative;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.calendar-day-cell.empty-cell {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.day-pill-status {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+
+.day-pill-status.open-pill {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.day-pill-status.fully-booked-pill {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Day State: Available */
+.calendar-day-cell.available-day:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.12);
+}
+
+/* Day State: Fully Booked (DISABLED) */
+.calendar-day-cell.fully-booked-day.disabled {
+  background: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #991b1b !important;
+  opacity: 0.65;
+  cursor: not-allowed !important;
+  text-decoration: none;
+}
+
+.calendar-day-cell.fully-booked-day.disabled .day-number {
+  color: #991b1b;
+}
+
+/* Day State: Past */
+.calendar-day-cell.past-day {
+  background: #f8fafc !important;
+  border-color: #f1f5f9 !important;
+  color: #cbd5e1 !important;
+  opacity: 0.45;
+  cursor: not-allowed !important;
+}
+
+.calendar-day-cell.past-day .day-number {
+  color: #94a3b8;
+}
+
+/* Day State: Today */
+.calendar-day-cell.today-day {
+  border: 2px solid #3b82f6;
+}
+
+/* Day State: Selected */
+.calendar-day-cell.selected-day {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+.calendar-day-cell.selected-day .day-number {
+  color: #ffffff;
+}
+
+.calendar-day-cell.selected-day .day-pill-status {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* Calendar Legend */
+.calendar-legend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.available-dot {
+  background: #22c55e;
+}
+
+.legend-dot.booked-dot {
+  background: #ef4444;
+}
+
+.legend-dot.selected-dot {
+  background: #2563eb;
+}
+
+.legend-dot.past-dot {
+  background: #cbd5e1;
+}
+
+/* =========================================
+   STEP 3: SLOT AVAILABILITY STATS & GRID
+========================================= */
+
+.slot-section-card {
+  background: #ffffff;
+  border: 2px solid #e0e7ff;
+}
+
+.slot-loading-state {
+  padding: 30px;
+  text-align: center;
+  color: #64748b;
+  font-size: 15px;
+}
+
+.slot-stats-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.slot-stat-card {
+  padding: 16px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.slot-stat-card.available-stat {
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+}
+
+.slot-stat-card.available-stat .stat-value {
+  color: #16a34a;
+}
+
+.slot-stat-card.booked-stat {
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+}
+
+.slot-stat-card.booked-stat .stat-value {
+  color: #dc2626;
+}
+
+.slot-stat-card.total-stat {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+}
+
+.slot-stat-card.total-stat .stat-value {
+  color: #0f172a;
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #475569;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 4px 0;
+}
+
+.stat-sub {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+/* Availability Progress Bar */
+.availability-bar-wrapper {
+  margin: 16px 0 24px 0;
+}
+
+.availability-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.availability-progress-track {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.availability-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444, #f59e0b);
+  border-radius: 10px;
+  transition: width 0.4s ease;
+}
+
+.slots-picker-header {
+  margin-bottom: 12px;
+}
+
+.slots-picker-header h4 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  color: #1e293b;
+}
+
+.slot-instruction-hint {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.slot-chip-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 16px;
+  border-radius: 11px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.slot-chip-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slot-clock-icon {
+  font-size: 16px;
+}
+
+.slot-time-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.slot-badge-status {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Slot Available */
+.slot-chip-btn.slot-available {
+  border-color: #cbd5e1;
+}
+
+.slot-chip-btn.slot-available:hover {
+  border-color: #2563eb;
+  background: #f8faff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+
+.slot-chip-btn.slot-available .slot-badge-status {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* Slot Booked (DISABLED) */
+.slot-chip-btn.slot-booked {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  opacity: 0.6;
+  cursor: not-allowed !important;
+}
+
+.slot-chip-btn.slot-booked .slot-time-text {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.slot-chip-btn.slot-booked .slot-badge-status {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Slot Selected */
+.slot-chip-btn.slot-selected {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.28);
+}
+
+.slot-chip-btn.slot-selected .slot-time-text {
+  color: #ffffff;
+}
+
+.slot-chip-btn.slot-selected .slot-badge-status {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* Selected Slot Preview */
+.selected-slot-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 18px;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 10px;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+.preview-icon {
+  font-size: 20px;
+}
+
+.preview-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-info strong {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  letter-spacing: 0.5px;
+}
+
+/* Reserve Submit Footer */
+.reservation-submit-footer {
+  margin-top: 10px;
+}
+
+.reserve-submit-btn {
+  width: 100%;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border: none;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.25);
+}
+
+.reserve-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+}
+
+.reserve-submit-btn:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .reservation-booking-wrapper {
+    padding: 20px 16px;
+  }
+
+  .slot-stats-container {
+    grid-template-columns: 1fr;
+  }
+
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day-cell {
+    min-height: 52px;
+    padding: 4px 2px;
+  }
+
+  .day-number {
+    font-size: 12px;
+  }
+
+  .day-pill-status {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
 }
 
 /* =========================================
