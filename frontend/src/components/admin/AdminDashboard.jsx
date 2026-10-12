@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   getAdminUsers,
@@ -32,7 +32,24 @@ function AdminDashboard({ user, logout }) {
     capacity: "",
     location: "",
     facilities: ""
-});
+  });
+
+  const fetchPendingReservations = async () => {
+    try {
+      const response = await getAdminReservations();
+      setReservations(response.data || []);
+    } catch {
+      // background fetch
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingReservations();
+    const interval = setInterval(fetchPendingReservations, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const pendingCount = reservations.filter((r) => r.status === "pending").length;
 
   // ================================
   // LOAD USERS
@@ -224,8 +241,11 @@ function AdminDashboard({ user, logout }) {
             🏫 Resources
           </button>
 
-          <button onClick={loadReservations}>
-            📋 Reservations
+          <button onClick={loadReservations} className="sidebar-btn-with-badge">
+            <span>📋 Reservations</span>
+            {pendingCount > 0 && (
+              <span className="admin-pending-badge">{pendingCount}</span>
+            )}
           </button>
 
         </aside>

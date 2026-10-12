@@ -97,6 +97,29 @@ export const getNotifications = () => {
   );
 };
 
+export const markNotificationAsRead = (id) => {
+  return axios.put(
+    `${API}/api/notifications/${id}/read`,
+    {},
+    authConfig()
+  );
+};
+
+export const markAllNotificationsAsRead = () => {
+  return axios.put(
+    `${API}/api/notifications/read-all`,
+    {},
+    authConfig()
+  );
+};
+
+export const deleteNotification = (id) => {
+  return axios.delete(
+    `${API}/api/notifications/${id}`,
+    authConfig()
+  );
+};
+
 export const cancelReservation = (id) => {
   return axios.delete(
     `${API}/api/reservations/${id}`,

@@ -638,6 +638,88 @@ app.get(
     }
 );
 
+app.put(
+    "/api/notifications/read-all",
+    authenticateToken,
+    (req, res) => {
+        const userId = req.user.id;
+
+        const sql = `
+            UPDATE notifications
+            SET is_read = 1
+            WHERE user_id = ?
+        `;
+
+        db.query(sql, [userId], (err, result) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({
+                    error: "Database error"
+                });
+            }
+
+            res.json({
+                message: "All notifications marked as read"
+            });
+        });
+    }
+);
+
+app.put(
+    "/api/notifications/:id/read",
+    authenticateToken,
+    (req, res) => {
+        const userId = req.user.id;
+        const notificationId = req.params.id;
+
+        const sql = `
+            UPDATE notifications
+            SET is_read = 1
+            WHERE id = ? AND user_id = ?
+        `;
+
+        db.query(sql, [notificationId, userId], (err, result) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({
+                    error: "Database error"
+                });
+            }
+
+            res.json({
+                message: "Notification marked as read"
+            });
+        });
+    }
+);
+
+app.delete(
+    "/api/notifications/:id",
+    authenticateToken,
+    (req, res) => {
+        const userId = req.user.id;
+        const notificationId = req.params.id;
+
+        const sql = `
+            DELETE FROM notifications
+            WHERE id = ? AND user_id = ?
+        `;
+
+        db.query(sql, [notificationId, userId], (err, result) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({
+                    error: "Database error"
+                });
+            }
+
+            res.json({
+                message: "Notification deleted successfully"
+            });
+        });
+    }
+);
+
 app.get(
     "/api/admin/users",
     authenticateToken,
