@@ -81,46 +81,23 @@ function UserDashboard({ user, logout }) {
 
   const makeReservation = async (slotsToBook) => {
     if (!resourceId) {
-      setMessage("Please select a resource first.");
-      return;
+      throw new Error("Please select a resource first.");
     }
 
-    try {
-      let response;
+    let response;
 
-      if (Array.isArray(slotsToBook) && slotsToBook.length > 0) {
-        response = await createReservation(resourceId, null, null, slotsToBook);
-      } else if (startTime && endTime) {
-        if (new Date(startTime) >= new Date(endTime)) {
-          setMessage("End time must be after start time.");
-          return;
-        }
-        response = await createReservation(resourceId, startTime, endTime);
-      } else {
-        setMessage("Please select at least one available time slot.");
-        return;
+    if (Array.isArray(slotsToBook) && slotsToBook.length > 0) {
+      response = await createReservation(resourceId, null, null, slotsToBook);
+    } else if (startTime && endTime) {
+      if (new Date(startTime) >= new Date(endTime)) {
+        throw new Error("End time must be after start time.");
       }
-
-      // Clear form
-      setResourceId("");
-      setStartTime("");
-      setEndTime("");
-
-      // Close reservation form
-      setShowReservationForm(false);
-
-      // Load updated reservations
-      await viewReservations();
-
-      // Show success message
-      setMessage(
-        response.data?.message || "Reservation created successfully!"
-      );
-    } catch (error) {
-      setMessage(
-        error.response?.data?.error || "Could not create reservation"
-      );
+      response = await createReservation(resourceId, startTime, endTime);
+    } else {
+      throw new Error("Please select at least one available time slot.");
     }
+
+    return response;
   };
 
 

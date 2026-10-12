@@ -2379,3 +2379,454 @@ button:disabled {
     height: 220px;
   }
 }
+
+/* =========================================
+   NEW RESERVATION FORM (rf- prefix)
+========================================= */
+
+.rf-wrapper {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rf-header {
+  text-align: center;
+}
+
+.rf-header h2 {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  color: #1e293b;
+}
+
+.rf-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.rf-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  position: relative;
+}
+
+.rf-step-badge {
+  display: inline-block;
+  background: #2563eb;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.rf-step-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.rf-step-hint {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 14px 0;
+}
+
+.rf-loading-inline {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.rf-select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 14.5px;
+  color: #1e293b;
+  background: #f8fafc;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.rf-select:focus {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.rf-resource-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.rf-resource-meta span {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* ---- CALENDAR STRIP ---- */
+.rf-calendar-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  padding-top: 4px;
+}
+
+.rf-calendar-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.rf-calendar-strip::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.rf-day-card {
+  flex: 0 0 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 6px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.rf-day-card:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: #eff6ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.12);
+}
+
+.rf-day-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.rf-day-selected {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  border-color: #1d4ed8 !important;
+  color: white !important;
+  box-shadow: 0 6px 18px rgba(37,99,235,0.3) !important;
+  transform: translateY(-3px) !important;
+}
+
+.rf-day-full {
+  background: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+
+.rf-day-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.rf-day-selected .rf-day-name {
+  color: rgba(255,255,255,0.8);
+}
+
+.rf-day-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.rf-day-selected .rf-day-num {
+  color: white;
+}
+
+.rf-day-month {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.rf-day-selected .rf-day-month {
+  color: rgba(255,255,255,0.7);
+}
+
+.rf-slot-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.rf-day-selected .rf-slot-count {
+  color: white !important;
+}
+
+/* ---- ALERTS ---- */
+.rf-alert-error {
+  background: #fff1f2;
+  border: 1.5px solid #fecdd3;
+  color: #be123c;
+  padding: 12px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rf-alert-success {
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  color: #15803d;
+  padding: 12px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---- DATE HIGHLIGHT ---- */
+.rf-date-highlight {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+/* ---- STATS ROW ---- */
+.rf-stats-row {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.rf-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.rf-stat-green { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
+.rf-stat-red   { background: #fef2f2; border: 1.5px solid #fecaca; }
+.rf-stat-grey  { background: #f8fafc; border: 1.5px solid #e2e8f0; }
+
+.rf-stat-num {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.rf-stat-green .rf-stat-num { color: #16a34a; }
+.rf-stat-red .rf-stat-num   { color: #dc2626; }
+.rf-stat-grey .rf-stat-num  { color: #334155; }
+
+.rf-stat-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* ---- SLOTS TABLE ---- */
+.rf-loading-block {
+  text-align: center;
+  padding: 30px;
+  color: #64748b;
+  font-size: 15px;
+}
+
+.rf-table-wrapper {
+  overflow-x: auto;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  margin-top: 4px;
+}
+
+.rf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.rf-table thead tr {
+  background: #f1f5f9;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.rf-table th {
+  padding: 13px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rf-table td {
+  padding: 13px 16px;
+  vertical-align: middle;
+}
+
+.rf-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.rf-row-available:hover {
+  background: #f8faff;
+}
+
+.rf-row-booked {
+  background: #fafafa;
+  opacity: 0.8;
+}
+
+.rf-td-num {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 13px;
+  width: 40px;
+}
+
+.rf-td-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rf-slot-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.rf-row-booked .rf-slot-name {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.rf-slot-label-small {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.rf-td-dur {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rf-badge-available {
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.rf-badge-booked {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.rf-td-action {
+  text-align: right;
+}
+
+.rf-btn-book-now {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+}
+
+.rf-btn-book-now:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+}
+
+.rf-btn-book-now:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.rf-btn-booked-label {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rf-no-slots {
+  text-align: center;
+  color: #64748b;
+  padding: 20px;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .rf-calendar-strip {
+    gap: 7px;
+  }
+
+  .rf-day-card {
+    flex: 0 0 60px;
+    padding: 8px 4px;
+  }
+
+  .rf-day-num {
+    font-size: 18px;
+  }
+
+  .rf-stats-row {
+    gap: 8px;
+  }
+
+  .rf-table th,
+  .rf-table td {
+    padding: 10px 10px;
+  }
+}

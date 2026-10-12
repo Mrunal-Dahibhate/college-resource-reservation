@@ -62,16 +62,15 @@ app.get("/api/resources", (req, res) => {
 // RESOURCE TIME SLOTS & AVAILABILITY
 // ==========================================
 const STANDARD_SLOTS = [
-    { id: 1, startTime: "08:00", endTime: "09:00", label: "08:00 AM - 09:00 AM" },
-    { id: 2, startTime: "09:00", endTime: "10:00", label: "09:00 AM - 10:00 AM" },
-    { id: 3, startTime: "10:00", endTime: "11:00", label: "10:00 AM - 11:00 AM" },
-    { id: 4, startTime: "11:00", endTime: "12:00", label: "11:00 AM - 12:00 PM" },
-    { id: 5, startTime: "12:00", endTime: "13:00", label: "12:00 PM - 01:00 PM" },
-    { id: 6, startTime: "13:00", endTime: "14:00", label: "01:00 PM - 02:00 PM" },
-    { id: 7, startTime: "14:00", endTime: "15:00", label: "02:00 PM - 03:00 PM" },
-    { id: 8, startTime: "15:00", endTime: "16:00", label: "03:00 PM - 04:00 PM" },
-    { id: 9, startTime: "16:00", endTime: "17:00", label: "04:00 PM - 05:00 PM" },
-    { id: 10, startTime: "17:00", endTime: "18:00", label: "05:00 PM - 06:00 PM" },
+    { id: 1, startTime: "09:00", endTime: "10:00", label: "09:00 AM - 10:00 AM", slotName: "9 to 10" },
+    { id: 2, startTime: "10:00", endTime: "11:00", label: "10:00 AM - 11:00 AM", slotName: "10 to 11" },
+    { id: 3, startTime: "11:00", endTime: "12:00", label: "11:00 AM - 12:00 PM", slotName: "11 to 12" },
+    { id: 4, startTime: "12:00", endTime: "13:00", label: "12:00 PM - 01:00 PM", slotName: "12 to 1" },
+    { id: 5, startTime: "13:00", endTime: "14:00", label: "01:00 PM - 02:00 PM", slotName: "1 to 2" },
+    { id: 6, startTime: "14:00", endTime: "15:00", label: "02:00 PM - 03:00 PM", slotName: "2 to 3" },
+    { id: 7, startTime: "15:00", endTime: "16:00", label: "03:00 PM - 04:00 PM", slotName: "3 to 4" },
+    { id: 8, startTime: "16:00", endTime: "17:00", label: "04:00 PM - 05:00 PM", slotName: "4 to 5" },
+    { id: 9, startTime: "17:00", endTime: "18:00", label: "05:00 PM - 06:00 PM", slotName: "5 to 6" },
 ];
 
 function computeSlotsForDate(dateStr, reservations) {
@@ -95,6 +94,7 @@ function computeSlotsForDate(dateStr, reservations) {
             startDateTime: slotStart,
             endDateTime: slotEnd,
             label: slot.label,
+            slotName: slot.slotName,
             isBooked
         };
     });
